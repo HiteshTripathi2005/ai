@@ -1,0 +1,340 @@
+import React, { useRef, useState, useEffect } from "react";
+import { Menu, Send, Plus, Copy, Check, User, Bot, Settings, EllipsisVertical, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+
+/**
+ * AI Chat App – React (JavaScript) + TailwindCSS
+ * ChatGPT-style UI (customized):
+ *  - User messages on LEFT, AI messages on RIGHT ✅
+ *  - Resizable history sidebar with draggable handle + closable ✅
+ *  - Cleaner, minimal input area ✅
+ */
+
+// -----------------------------
+// Utilities
+// -----------------------------
+
+const cx = (...xs) => xs.filter(Boolean).join(" ");
+const prettyNow = () => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date());
+
+// Fake streaming helper (typewriter)
+function useTypewriter(text, active, speed = 12) {
+  const [out, setOut] = useState("");
+  useEffect(() => {
+    if (!active) return setOut(text);
+    setOut("");
+    let i = 0;
+    const id = setInterval(() => {
+      setOut((prev) => (i < text.length ? prev + text[i++] : prev));
+      if (i >= text.length) clearInterval(id);
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, active, speed]);
+  return out;
+}
+
+// -----------------------------
+// Sidebar (history + actions) – resizable
+// -----------------------------
+
+function Sidebar({ width, setWidth, open, setOpen }) {
+  const MIN_W = 220;
+  const MAX_W = 520;
+  const handleRef = useRef(null);
+
+  useEffect(() => {
+    const handle = handleRef.current;
+    if (!handle) return;
+
+    let startX = 0;
+    let startW = 0;
+
+    const onMouseMove = (e) => {
+      const delta = e.clientX - startX;
+      let next = Math.min(MAX_W, Math.max(MIN_W, startW + delta));
+      setWidth(next);
+    };
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    const onMouseDown = (e) => {
+      startX = e.clientX;
+      startW = width;
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    };
+
+    handle.addEventListener("mousedown", onMouseDown);
+    return () => handle.removeEventListener("mousedown", onMouseDown);
+  }, [width, setWidth]);
+
+  return (
+    <aside
+      style={{ width: open ? width : 0 }}
+      className={cx(
+        "relative h-full flex-shrink-0 border-r border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50 dark:bg-zinc-900 transition-[width] duration-200 overflow-hidden"
+      )}
+    >
+      <div className={cx("h-full flex flex-col", open ? "px-3" : "px-0")}>        
+        <div className="flex items-center justify-between h-14">
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-zinc-200/50 dark:hover:bg-zinc-800"
+            aria-label="Toggle sidebar"
+            title="Toggle sidebar"
+          >
+            {open ? <ChevronLeft className="h-5 w-5"/> : <ChevronRight className="h-5 w-5"/>}
+          </button>
+
+          {open && (
+            <button className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 px-3 py-2 text-sm font-medium hover:opacity-90">
+              <Plus className="h-4 w-4"/>
+              New chat
+            </button>
+          )}
+        </div>
+
+        {open && (
+          <div className="mt-2 flex-1 overflow-auto space-y-2 pr-1">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <button key={i} className="w-full text-left truncate rounded-xl px-3 py-2 text-sm hover:bg-white dark:hover:bg-zinc-800/80 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700">
+                {i === 0 ? "Design the landing page" : `Chat ${i}`}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="border-t border-zinc-200/60 dark:border-zinc-800/60 py-3"> 
+          <div className="flex items-center gap-2 px-2">
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-zinc-200/50 dark:hover:bg-zinc-800" title="Settings">
+              <Settings className="h-5 w-5"/>
+            </button>
+            {open && <span className="text-sm text-zinc-500">Settings</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Drag handle */}
+      {open && (
+        <div
+          ref={handleRef}
+          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50"
+          title="Drag to resize"
+        />
+      )}
+    </aside>
+  );
+}
+
+// -----------------------------
+// Header (model switcher / title)
+// -----------------------------
+
+function ChatHeader({ onToggleSidebar }) {
+  return (
+    <header className="h-14 border-b border-zinc-200/60 dark:border-zinc-800/60 px-3 md:px-5 flex items-center justify-between bg-white/60 dark:bg-zinc-950/60 backdrop-blur">
+      <div className="flex items-center gap-2">
+        <button className="md:hidden" onClick={onToggleSidebar} aria-label="Open sidebar">
+          <Menu className="h-5 w-5"/>
+        </button>
+        <div className="text-sm text-zinc-500">Chat</div>
+      </div>
+      <div className="flex items-center gap-2">
+        <ModelTag name="GPT-Style"/>
+        <button className="inline-flex h-9 items-center gap-2 rounded-xl border border-zinc-200 dark:border-zinc-800 px-3 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900">
+          <Sparkles className="h-4 w-4"/> Explore
+        </button>
+        <button className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+          <EllipsisVertical className="h-5 w-5"/>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function ModelTag({ name }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 dark:border-zinc-800 px-3 py-1 text-xs text-zinc-600 dark:text-zinc-300">
+      <Bot className="h-3.5 w-3.5"/> {name}
+    </span>
+  );
+}
+
+// -----------------------------
+// Message bubble (user LEFT, AI RIGHT)
+// -----------------------------
+
+function MessageBubble({ msg }) {
+  const isUser = msg.role === "user"; // user -> left, assistant -> right
+  const [copied, setCopied] = useState(false);
+  const shown = useTypewriter(msg.content, msg.role === "assistant", 8);
+
+  return (
+    <div className={cx("w-full flex", isUser ? "justify-start" : "justify-end")}> 
+      <div className={cx(
+        "group relative max-w-[min(82%,800px)] w-fit",
+        isUser
+          ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+          : "bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70",
+        "rounded-2xl px-4 md:px-5 py-3 shadow-sm"
+      )}>
+        <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
+          <div className={cx("inline-flex h-6 w-6 items-center justify-center rounded-full", isUser ? "bg-zinc-300 text-zinc-700" : "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900")}> 
+            {isUser ? <User className="h-3.5 w-3.5"/> : <Bot className="h-3.5 w-3.5"/>}
+          </div>
+          <span className="font-medium">{isUser ? "You" : "Assistant"}</span>
+          <span>•</span>
+          <span>{msg.timestamp}</span>
+          {!isUser && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(msg.content);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1200);
+              }}
+              className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity inline-flex h-7 w-7 items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+              title="Copy"
+            >
+              {copied ? <Check className="h-3.5 w-3.5"/> : <Copy className="h-3.5 w-3.5"/>}
+            </button>
+          )}
+        </div>
+        <div className="prose prose-zinc dark:prose-invert max-w-none prose-p:my-3 prose-pre:my-3">
+          {shown.split("\n").map((line, i) => (
+            <p key={i} className="whitespace-pre-wrap leading-7">{line}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------
+// Thread (message list)
+// -----------------------------
+
+function Thread({ items }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTo({ top: ref.current.scrollHeight, behavior: "smooth" });
+  }, [items.length]);
+
+  return (
+    <div ref={ref} className="flex-1 overflow-auto px-2 md:px-6 py-4 md:py-6 space-y-3">
+      {items.map((m) => (
+        <MessageBubble key={m.id} msg={m} />
+      ))}
+    </div>
+  );
+}
+
+// -----------------------------
+// Minimal Input area
+// -----------------------------
+
+function ChatInput({ onSend, isStreaming }) {
+  const [value, setValue] = useState("");
+  const disabled = isStreaming || !value.trim();
+
+  return (
+    <div className="border-t border-zinc-200/60 dark:border-zinc-800/60 p-3 md:p-4 bg-white/60 dark:bg-zinc-950/60 backdrop-blur">
+      <div className="mx-auto w-full max-w-3xl">
+        <div className="flex items-center gap-2 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 py-1.5 shadow-sm">
+          <textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Message AI..."
+            className="flex-1 resize-none bg-transparent outline-none placeholder:text-zinc-400 leading-6 pt-1 pb-1 max-h-32 min-h-[36px]"
+            rows={1}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                if (!disabled) onSend(value.trim());
+                setValue("");
+              }
+            }}
+          />
+          <button
+            disabled={disabled}
+            onClick={() => {
+              if (!disabled) onSend(value.trim());
+              setValue("");
+            }}
+            className={cx(
+              "inline-flex h-9 w-9 flex-none items-center justify-center rounded-full",
+              disabled
+                ? "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+                : "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90"
+            )}
+            title="Send"
+          >
+            <Send className="h-4 w-4"/>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------
+// HomePage (composition)
+// -----------------------------
+
+export default function HomePage() {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarW, setSidebarW] = useState(280);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [messages, setMessages] = useState([
+    { id: "m1", role: "user", content: "Explain closures in JavaScript with a quick example.", timestamp: prettyNow() },
+    { id: "m2", role: "assistant", content: "A closure is created when a function remembers its lexical scope even when executed outside it.\n\n```js\nfunction makeCounter() {\n  let count = 0;\n  return function() {\n    count++;\n    return count;\n  }\n}\nconst c = makeCounter();\nc(); // 1\nc(); // 2\n```\nThe inner function keeps access to `count`.", timestamp: prettyNow() },
+  ]);
+
+  const handleSend = (text) => {
+    const userMsg = { id: crypto.randomUUID(), role: "user", content: text, timestamp: prettyNow() };
+    setMessages((xs) => [...xs, userMsg]);
+
+    // Fake assistant reply with streaming
+    setIsStreaming(true);
+    setTimeout(() => {
+      const reply = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: `Here's a summary of your message: \n\n> ${text}\n\nWhat would you like to do next?`,
+        timestamp: prettyNow(),
+      };
+      setMessages((xs) => [...xs, reply]);
+      setIsStreaming(false);
+    }, 600);
+  };
+
+  return (
+    <div className="h-dvh w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
+      <Sidebar width={sidebarW} setWidth={setSidebarW} open={sidebarOpen} setOpen={setSidebarOpen} />
+
+      <main className="flex-1 grid grid-rows-[auto,1fr,auto] min-w-0">
+        <ChatHeader onToggleSidebar={() => setSidebarOpen((v) => !v)} />
+        <Thread items={messages} />
+        <ChatInput onSend={handleSend} isStreaming={isStreaming} />
+      </main>
+    </div>
+  );
+}
+
+// -----------------------------
+// Simple runtime tests (dev)
+// -----------------------------
+
+function _test_cx() {
+  console.assert(cx('a', false, 'b') === 'a b', 'cx should join truthy classes');
+}
+function _test_split() {
+  const text = 'line1\nline2\nline3';
+  const out = text.split("\n");
+  console.assert(out.length === 3 && out[1] === 'line2', 'split("\\n") should produce three lines');
+}
+function _test_replyTemplate() {
+  const sample = 'hello';
+  const s = `Here's a summary of your message: \n\n> ${sample}\n\nWhat would you like to do next?`;
+  console.assert(s.includes('> hello'), 'reply template should inject quoted text');
+}
+try { _test_cx(); _test_split(); _test_replyTemplate(); } catch (e) { console.error('Tests failed:', e); }
