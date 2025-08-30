@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../stores/authStore';
+import toast from 'react-hot-toast';
+import { Circles } from 'react-loader-spinner';
 
 const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -12,6 +15,9 @@ const RegisterPage = () => {
     confirmPassword: ''
   });
 
+  const navigate = useNavigate();
+  const { register, isLoading } = useAuthStore();
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -20,14 +26,16 @@ const RegisterPage = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle registration logic here
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      toast.error('Passwords do not match');
       return;
     }
-    console.log('Registration attempt:', formData);
+    const result = await register(formData.name, formData.email, formData.password);
+    if (result.success) {
+      navigate('/');
+    }
   };
 
   return (
@@ -180,9 +188,12 @@ const RegisterPage = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-2 px-4 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              Create Account
+              {isLoading ? <div className="flex justify-center items-center w-full">
+      <Circles height={20} width={20} color="white" ariaLabel="circles-loading" visible={true} />
+    </div> : 'Create Account'}
             </button>
           </form>
 

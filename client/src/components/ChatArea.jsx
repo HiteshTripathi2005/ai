@@ -4,7 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 function MessageBubble({ msg }) {
-  const isUser = msg.role === "user"; // user -> right, assistant -> left
+  const isUser = msg.role === "user";
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -16,54 +16,74 @@ function MessageBubble({ msg }) {
     setTimeout(() => setCopied(false), 1200);
   };
 
-  const timestamp = new Intl.DateTimeFormat(undefined, {
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(parseInt(msg.id) || Date.now()));
-
   return (
-    <div className={`w-full flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`group relative max-w-[min(82%,800px)] w-fit ${
-        isUser
-          ? "bg-blue-500 text-white"
-          : "bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70"
-      } rounded-2xl px-4 md:px-5 py-3 shadow-sm`}>
-        <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
-          <div className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
-            isUser ? "bg-blue-600 text-white" : "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+    <div className={`w-full flex mb-6 ${isUser ? "justify-end" : "justify-start"}`}>
+      <div className={`group relative max-w-[min(85%,700px)] ${
+        isUser ? "ml-12" : "mr-12"
+      }`}>
+        {/* Avatar */}
+        <div className={`flex items-center mb-2 ${isUser ? "justify-end" : "justify-start"}`}>
+          <div className={`inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm ${
+            isUser 
+              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" 
+              : "bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-300"
           }`}>
-            {isUser ? <User className="h-3.5 w-3.5"/> : <Bot className="h-3.5 w-3.5"/>}
+            {isUser ? <User className="h-4 w-4"/> : <Bot className="h-4 w-4"/>}
           </div>
-          <span className={`font-medium ${isUser ? "text-blue-100" : "text-zinc-600 dark:text-zinc-300"}`}>
-            {isUser ? "You" : "Assistant"}
-          </span>
-          <span className={isUser ? "text-blue-200" : "text-zinc-400"}>•</span>
-          <span className={isUser ? "text-blue-200" : "text-zinc-400"}>{timestamp}</span>
-          {!isUser && (
-            <button
-              onClick={handleCopy}
-              className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity inline-flex h-7 w-7 items-center justify-center rounded-md border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900"
-              title="Copy"
-            >
-              {copied ? <Check className="h-3.5 w-3.5"/> : <Copy className="h-3.5 w-3.5"/>}
-            </button>
-          )}
         </div>
-        <div className={`prose prose-zinc dark:prose-invert max-w-none prose-p:my-3 prose-pre:my-3 ${
-          isUser ? "prose-invert" : ""
-        }`}>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {(msg.parts || [])
-              .map((p) => (p.type === 'text' ? p.text : ''))
-              .join('')}
-          </ReactMarkdown>
+
+        {/* Message bubble */}
+        <div className={`relative ${
+          isUser
+            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
+            : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm"
+        } rounded-2xl px-5 py-4`}>
+          
+
+          {/* Message content */}
+          <div className={`text-sm leading-relaxed ${
+            isUser 
+              ? "text-white" 
+              : "text-gray-800 dark:text-gray-200 prose prose-sm prose-gray dark:prose-invert max-w-none"
+          }`}>
+            {isUser ? (
+              <div className="whitespace-pre-wrap">
+                {(msg.parts || [])
+                  .map((p) => (p.type === 'text' ? p.text : ''))
+                  .join('')}
+              </div>
+            ) : (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {(msg.parts || [])
+                  .map((p) => (p.type === 'text' ? p.text : ''))
+                  .join('')}
+              </ReactMarkdown>
+            )}
+          </div>
+
+          {/* Timestamp - subtle */}
+          <div className={`text-xs mt-3 ${
+            isUser ? "text-blue-100" : "text-gray-500 dark:text-gray-400"
+          }`}>
+            {new Intl.DateTimeFormat(undefined, {
+              hour: "2-digit",
+              minute: "2-digit"
+            }).format(new Date(parseInt(msg.id) || Date.now()))}
+          </div>
         </div>
+
+        {/* Message tail */}
+        <div className={`absolute top-10 w-4 h-4 transform rotate-45 ${
+          isUser
+            ? "-right-2 bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25"
+            : "-left-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700"
+        }`}></div>
       </div>
     </div>
   );
 }
 
-export default function ChatArea({ messages, status, error }) {
+export default function ChatArea({ messages, status, isAuthenticated }) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
@@ -128,10 +148,20 @@ export default function ChatArea({ messages, status, error }) {
         id="messages-root"
       >
         {messages.length === 0 ? (
-          <div className="text-center mt-8">
-            <div className="text-gray-500 text-lg mb-2">Welcome to AI Chat</div>
-            <div className="text-gray-400 text-sm">
-              Start a conversation by typing a message below
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center max-w-md mx-auto px-6">
+              <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-600 dark:text-blue-400 mb-6">
+                <Bot className="h-8 w-8"/>
+              </div>
+              <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-3">
+                Welcome to AI Chat
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                {isAuthenticated 
+                  ? "Start a conversation by typing a message below. I'm here to help with any questions you have!" 
+                  : "Please login to start chatting with AI and get personalized assistance."
+                }
+              </p>
             </div>
           </div>
         ) : (
@@ -139,37 +169,35 @@ export default function ChatArea({ messages, status, error }) {
         )}
 
         {status === "streaming" && (
-          <div className="flex justify-start">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200/70 dark:border-zinc-800/70 rounded-2xl px-4 py-3 shadow-sm">
-              <div className="flex items-center gap-2 text-xs text-zinc-500 mb-2">
-                <div className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900">
-                  <Bot className="h-3.5 w-3.5" />
+          <div className="w-full flex mb-6 justify-start">
+            <div className="relative max-w-[min(85%,700px)] mr-12">
+              {/* Avatar */}
+              <div className="flex items-center mb-2 justify-start">
+                <div className="inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-300 animate-pulse">
+                  <Bot className="h-4 w-4"/>
                 </div>
-                <span className="font-medium text-zinc-600 dark:text-zinc-300">
-                  Assistant
-                </span>
-                <span className="text-zinc-400">•</span>
-                <span className="text-zinc-400">typing...</span>
               </div>
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"></div>
-                <div
-                  className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.1s" }}
-                />
-                <div
-                  className="w-2 h-2 bg-zinc-400 rounded-full animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
 
-        {error && (
-          <div className="flex justify-center">
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 text-red-600 dark:text-red-400 text-sm">
-              {String(error.message || error)}
+              {/* Typing bubble */}
+              <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm rounded-2xl px-5 py-4">
+                <div className="flex items-center space-x-2">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    />
+                    <div
+                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    />
+                  </div>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Assistant is typing...</span>
+                </div>
+              </div>
+
+              {/* Message tail */}
+              <div className="absolute top-10 w-4 h-4 transform rotate-45 -left-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700"></div>
             </div>
           </div>
         )}
@@ -184,7 +212,7 @@ export default function ChatArea({ messages, status, error }) {
             scrollToBottom(true);
             setIsUserScrolledUp(false);
           }}
-          className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 px-3 py-2 text-sm shadow hover:opacity-90"
+          className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm shadow-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           title="Scroll to latest"
         >
           <ChevronDown className="h-4 w-4" />

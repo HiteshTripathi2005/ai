@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useState } from 'react';
 import clsx from "clsx";
-import { ChevronLeft, ChevronRight, Plus, Settings, MessageCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Settings, MessageCircle, Trash2 } from "lucide-react";
 
-function History({ width, setWidth, open, setOpen, onNewChat, currentChatId, chatHistory }) {
+function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSelectChat, currentChatId, chatHistory, isAuthenticated }) {
   const MIN_W = 220;
   const MAX_W = 520;
   const handleRef = useRef(null);
@@ -59,7 +59,13 @@ function History({ width, setWidth, open, setOpen, onNewChat, currentChatId, cha
           {open && (
             <button
               onClick={handleNewChat}
-              className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 px-3 py-2 text-sm font-medium hover:opacity-90"
+              disabled={!isAuthenticated}
+              className={clsx(
+                "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium",
+                isAuthenticated
+                  ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90"
+                  : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
+              )}
             >
               <Plus className="h-4 w-4"/>
               New chat
@@ -71,18 +77,36 @@ function History({ width, setWidth, open, setOpen, onNewChat, currentChatId, cha
           <div className="mt-2 flex-1 overflow-auto space-y-2 pr-1">
             {chatHistory && chatHistory.length > 0 ? (
               chatHistory.map((chat) => (
-                <button
-                  key={chat.id}
+                <div
+                  key={chat._id || chat.id}
                   className={clsx(
-                    "w-full text-left truncate rounded-xl px-3 py-2 text-sm hover:bg-white dark:hover:bg-zinc-800/80 border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700",
-                    currentChatId === chat.id && "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                    "group relative w-full rounded-xl border border-transparent hover:border-zinc-200 dark:hover:border-zinc-700",
+                    (currentChatId === chat._id || currentChatId === chat.id) && "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
                   )}
                 >
-                  <div className="flex items-center gap-2">
-                    <MessageCircle className="h-4 w-4 text-zinc-400" />
-                    <span className="truncate">{chat.title || "New Chat"}</span>
-                  </div>
-                </button>
+                  <button
+                    onClick={() => onSelectChat(chat._id || chat.id)}
+                    className="w-full text-left truncate px-3 py-2 text-sm hover:bg-white dark:hover:bg-zinc-800/80"
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="h-4 w-4 text-zinc-400" />
+                      <span className="truncate">{chat.title || "New Chat"}</span>
+                    </div>
+                  </button>
+                  
+                  {chatHistory.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteChat(chat._id || chat.id);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 inline-flex h-6 w-6 items-center justify-center rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-zinc-400 hover:text-red-600 transition-all"
+                      title="Delete chat"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               ))
             ) : (
               <div className="text-center text-zinc-500 text-sm mt-8">

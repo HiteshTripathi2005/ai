@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from "react";
 import cx from "clsx";
 import { Send, Loader2 } from "lucide-react";
 
-function Composer({ onSend, isStreaming, width }) {
+function Composer({ onSend, isStreaming, width, disabled = false }) {
   const [value, setValue] = useState("");
   const textareaRef = useRef(null);
-  const disabled = isStreaming || !value.trim();
+  const sendDisabled = isStreaming || !value.trim() || disabled;
+  const inputDisabled = isStreaming;
 
   // Auto-focus the textarea when component mounts
   useEffect(() => {
@@ -28,7 +29,7 @@ function Composer({ onSend, isStreaming, width }) {
   }, [value]);
 
   const handleSend = () => {
-    if (!disabled && value.trim()) {
+    if (!sendDisabled && value.trim()) {
       try {
         onSend(value.trim());
         setValue("");
@@ -58,10 +59,10 @@ function Composer({ onSend, isStreaming, width }) {
             ref={textareaRef}
             value={value}
             onChange={handleInputChange}
-            placeholder="Message AI..."
+            placeholder={disabled ? "Please login to send messages..." : "Message AI..."}
             className="flex-1 resize-none bg-transparent outline-none placeholder:text-zinc-400 leading-6 pt-2 min-h-[36px] max-h-32 overflow-y-auto"
             rows={1}
-            disabled={isStreaming}
+            disabled={inputDisabled}
             onKeyDown={handleKeyDown}
             aria-label="Type your message"
             autoComplete="off"
@@ -70,15 +71,15 @@ function Composer({ onSend, isStreaming, width }) {
           
           <button
             onClick={handleSend}
-            disabled={disabled}
+            disabled={sendDisabled}
             className={cx(
               "inline-flex h-9 w-9 flex-none items-center justify-center rounded-full transition-all duration-200",
-              disabled
+              sendDisabled
                 ? "bg-zinc-200 text-zinc-400 cursor-not-allowed"
                 : "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90 hover:scale-105 active:scale-95"
             )}
-            title={isStreaming ? "AI is responding..." : "Send message"}
-            aria-label={isStreaming ? "AI is responding" : "Send message"}
+            title={isStreaming ? "AI is responding..." : disabled ? "Please login to send messages" : "Send message"}
+            aria-label={isStreaming ? "AI is responding" : disabled ? "Please login to send messages" : "Send message"}
           >
             {isStreaming ? (
               <Loader2 className="h-4 w-4 animate-spin" />
