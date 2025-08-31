@@ -1,6 +1,7 @@
 import { google } from '@ai-sdk/google';
 import { stepCountIs, streamText } from 'ai';
 import { timeTool } from '../utils/tools.js';
+import { systemPrompt } from '../utils/systemPrompt.js';
 import Chat from '../models/Chat.js';
 
 export const chat = async (req, res) => {
@@ -38,18 +39,41 @@ export const chat = async (req, res) => {
         chat.messages.push(userMessage);
         await chat.save();
 
+        let accumulatedParts = [];
+        let tempText = '';
+
         const result = await streamText({
             model: google('gemini-2.5-flash'),
+            system: systemPrompt,
             prompt,
             stopWhen: stepCountIs(10),
-            // tools: {timeTool},
+            tools: {timeTool},
+            onChunk: (chunk) => {
+                if (chunk.chunk) {
+                    if (chunk.chunk.type === 'text-delta' && chunk.chunk.text) {
+                        tempText += chunk.chunk.text;
+                    } else if (chunk.chunk.type === 'tool-call' && chunk.chunk.toolName && chunk.chunk.input) {
+                        accumulatedParts.push({
+                            type: 'tool-call',
+                            toolName: chunk.chunk.toolName,
+                            input: chunk.chunk.input
+                        });
+                    } else if (chunk.chunk.type === 'tool-result' && chunk.chunk.toolCallId && chunk.chunk.result) {
+                        accumulatedParts.push({
+                            type: 'tool-result',
+                            toolCallId: chunk.chunk.toolCallId,
+                            result: chunk.chunk.result
+                        });
+                    }
+                }
+            }
         });
 
         // Prepare assistant message
         let assistantMessage = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            parts: [{ type: 'text', text: '' }]
+            parts: []
         };
 
         // Get the original response
@@ -58,7 +82,13 @@ export const chat = async (req, res) => {
         // Save the assistant message after the stream is complete
         result.text.then(async (finalText) => {
             try {
-                assistantMessage.parts[0].text = finalText;
+                if (tempText) {
+                    accumulatedParts.push({
+                        type: 'text',
+                        text: tempText
+                    });
+                }
+                assistantMessage.parts = accumulatedParts;
                 chat.messages.push(assistantMessage);
                 await chat.save();
                 console.log('Assistant message saved to database');
@@ -170,10 +200,8 @@ export const deleteChat = async (req, res) => {
             });
         }
 
-        const chat = await Chat.findOneAndUpdate(
-            { _id: chatId, user: userId, isActive: true },
-            { isActive: false },
-            { new: true }
+        const chat = await Chat.findOneAndDelete(
+            { _id: chatId, user: userId, isActive: true }
         );
 
         if (!chat) {

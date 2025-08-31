@@ -17,6 +17,7 @@ const HomePage = () => {
     chatHistory,
     currentChatId,
     isStreaming,
+    isLoadingMessages,
     sendMessage,
     handleNewChat,
     deleteChat,
@@ -69,7 +70,12 @@ const HomePage = () => {
         </div>
         {/* Scrollable ChatArea */}
         <div className="flex-1 flex-col-reverse overflow-y-auto">
-          <ChatArea messages={messages} status={status} isAuthenticated={isAuthenticated} />
+          <ChatArea 
+            messages={messages} 
+            status={status} 
+            isAuthenticated={isAuthenticated} 
+            isLoadingMessages={isLoadingMessages}
+          />
         </div>
         {/* Fixed Composer */}
         <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950">

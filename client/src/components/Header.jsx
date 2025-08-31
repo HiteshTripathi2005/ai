@@ -34,8 +34,8 @@ export default function Header({ width, setWidth  }) {
   return (
     <header className="h-14 border-b border-zinc-200/60 dark:border-zinc-800/60 px-3 md:px-5 flex items-center justify-between bg-white/60 dark:bg-zinc-950/60 backdrop-blur">
       <div className="flex items-center gap-5">
-        <button className={width === 0 ? "" : "md:hidden"} onClick={() => setWidth(width === 0 ? 280 : 0)} aria-label="Open sidebar">
-          <Menu className="h-4 w-4"/>
+        <button className={width === 0 ? "cursor-pointer" : "md:hidden"} onClick={() => setWidth(width === 0 ? 280 : 0)} aria-label="Open sidebar">
+          <Menu className="h-[18px] w-[18px]"/>
         </button>
         <div className="text-sm text-zinc-500">AI Chat</div>
       </div>
@@ -47,7 +47,7 @@ export default function Header({ width, setWidth  }) {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+              className="inline-flex h-9 w-9 items-center justify-center cursor-pointer rounded-full border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
               aria-label="User menu"
             >
               {user.avatar ? (

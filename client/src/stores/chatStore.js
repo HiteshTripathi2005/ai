@@ -9,6 +9,7 @@ export const useChatStore = create((set, get) => ({
   status: "ready",
   error: null,
   isStreaming: false,
+  isLoadingMessages: false,
 
   // UI state
   sidebarOpen: true,
@@ -31,6 +32,7 @@ export const useChatStore = create((set, get) => ({
   setSidebarW: (sidebarW) => set({ sidebarW }),
   setChatHistory: (chatHistory) => set({ chatHistory }),
   setCurrentChatId: (currentChatId) => set({ currentChatId }),
+  setIsLoadingMessages: (isLoadingMessages) => set({ isLoadingMessages }),
 
   // Chat functions
   sendMessage: async (prompt) => {
@@ -244,16 +246,23 @@ export const useChatStore = create((set, get) => ({
   },
 
   selectChat: async (chatId) => {
+    const { setCurrentChatId, setMessages, setIsLoadingMessages } = get();
+    
+    // Set loading state immediately
+    setIsLoadingMessages(true);
+    setCurrentChatId(chatId);
+    setMessages([]); // Clear current messages to show skeleton
+    
     try {
       const response = await api.get(`/chat/chats/${chatId}`);
       const chat = response.data.data;
-      const { setCurrentChatId, setMessages } = get();
-      setCurrentChatId(chat._id);
       setMessages(chat.messages || []);
       return { success: true };
     } catch (error) {
       console.error('Failed to fetch chat:', error);
       return { success: false, message: error.message };
+    } finally {
+      setIsLoadingMessages(false);
     }
   },
 
@@ -294,6 +303,21 @@ export const useChatStore = create((set, get) => ({
   },
 
   clearMessages: () => set({ messages: [] }),
+
+  clearAll: () => set({
+    messages: [],
+    status: "ready",
+    error: null,
+    isStreaming: false,
+    isLoadingMessages: false,
+    chatHistory: [{
+      _id: "default-chat",
+      title: "Welcome Chat",
+      messages: [],
+      createdAt: new Date()
+    }],
+    currentChatId: "default-chat",
+  }),
 
   toggleSidebar: () => {
     const { sidebarOpen, setSidebarOpen } = get();

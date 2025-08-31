@@ -71,13 +71,6 @@ function MessageBubble({ msg }) {
             }).format(new Date(parseInt(msg.id) || Date.now()))}
           </div>
         </div>
-
-        {/* Message tail */}
-        <div className={`absolute top-10 w-4 h-4 transform rotate-45 ${
-          isUser
-            ? "-right-2 bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25"
-            : "-left-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700"
-        }`}></div>
       </div>
     </div>
   );

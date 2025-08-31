@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
+import { useChatStore } from './chatStore';
 
 export const useAuthStore = create((set, get) => ({
   // Auth state
@@ -87,6 +88,8 @@ export const useAuthStore = create((set, get) => ({
         isAuthenticated: false,
         error: null,
       });
+      // Clear chat data
+      useChatStore.getState().clearAll();
       toast.success('Logged out successfully.');
     } catch (error) {
       const message = error.response?.data?.message || 'Logout failed';
@@ -97,6 +100,8 @@ export const useAuthStore = create((set, get) => ({
         isAuthenticated: false,
         error: null,
       });
+      // Clear chat data even on error
+      useChatStore.getState().clearAll();
     }
   },
 

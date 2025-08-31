@@ -49,7 +49,7 @@ function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSe
         <div className="flex items-center justify-between h-14">
           <button
             onClick={() => setWidth(0)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-zinc-200/50 dark:hover:bg-zinc-800"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl hover:bg-zinc-200/50 dark:hover:bg-zinc-800 cursor-pointer"
             aria-label="Toggle sidebar"
             title="Toggle sidebar"
           >
@@ -61,13 +61,13 @@ function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSe
               onClick={handleNewChat}
               disabled={!isAuthenticated}
               className={clsx(
-                "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium",
+                "inline-flex items-center gap-2 rounded-xl px-2 py-1.5 cursor-pointer text-xs font-medium",
                 isAuthenticated
                   ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90"
                   : "bg-zinc-200 text-zinc-400 cursor-not-allowed"
               )}
             >
-              <Plus className="h-4 w-4"/>
+              <Plus className="h-3 w-3"/>
               New chat
             </button>
           )}
