@@ -22,12 +22,15 @@ export const chat = async (req, res) => {
         }
 
         if (!chat) {
+            const chatTitle = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
+            console.log('Creating new chat with title:', chatTitle);
             chat = new Chat({
                 user: userId,
-                title: prompt.substring(0, 50) + (prompt.length > 50 ? '...' : ''),
+                title: chatTitle,
                 messages: []
             });
             await chat.save();
+            console.log('New chat created with ID:', chat._id, 'and title:', chat.title);
         }
 
         // Add user message to chat
@@ -73,7 +76,8 @@ export const chat = async (req, res) => {
         let assistantMessage = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            parts: []
+            parts: [],
+            raw: null
         };
 
         // Get the original response
@@ -89,9 +93,51 @@ export const chat = async (req, res) => {
                     });
                 }
                 assistantMessage.parts = accumulatedParts;
+
+                // Attempt to attach the raw AI response to the message. If the
+                // full result object is not serializable, fall back to storing
+                // the final text under raw.
+                try {
+                    // Some SDK responses may contain circular refs; attempt a
+                    // safe serialization by JSON.stringify then parse. If that
+                    // fails, use finalText as the raw payload.
+                    assistantMessage.raw = JSON.parse(JSON.stringify(result)) || { text: finalText };
+                } catch (serializeError) {
+                    assistantMessage.raw = { text: finalText };
+                }
                 chat.messages.push(assistantMessage);
                 await chat.save();
                 console.log('Assistant message saved to database');
+
+                // Update chat title after first message exchange if it's still the default
+                if (chat.messages.length === 2 && (chat.title === 'New Chat' || chat.title.length < 10)) {
+                    try {
+                        // Create a more descriptive title based on the conversation
+                        const userMessage = chat.messages.find(msg => msg.role === 'user');
+                        
+                        if (userMessage) {
+                            const userText = userMessage.parts.find(part => part.type === 'text')?.text || '';
+                            
+                            // Create title from user prompt, limited to 50 characters
+                            let newTitle = userText.substring(0, 50);
+                            if (userText.length > 50) {
+                                newTitle += '...';
+                            }
+                            
+                            // If the title would be too short, use more of the prompt
+                            if (newTitle.length < 10 && userText.length > 10) {
+                                newTitle = userText.substring(0, 100) + (userText.length > 100 ? '...' : '');
+                            }
+                            
+                            if (newTitle.trim()) {
+                                await Chat.findByIdAndUpdate(chat._id, { title: newTitle });
+                                console.log('Chat title updated to:', newTitle);
+                            }
+                        }
+                    } catch (titleError) {
+                        console.error('Error updating chat title:', titleError);
+                    }
+                }
             } catch (error) {
                 console.error('Error saving assistant message:', error);
             }
@@ -114,7 +160,7 @@ export const getChats = async (req, res) => {
         const chats = await Chat.find({ user: userId, isActive: true })
             .sort({ updatedAt: -1 })
             .select('title messages createdAt updatedAt')
-            .limit(50);
+            .lean();
 
         res.status(200).json({
             success: true,
@@ -145,7 +191,7 @@ export const createChat = async (req, res) => {
 
         res.status(201).json({
             success: true,
-            data: chat
+            data: chat.toObject()
         });
     } catch (error) {
         console.error("Error creating chat:", error);
@@ -162,7 +208,7 @@ export const getChat = async (req, res) => {
         const userId = req.user._id;
         const { chatId } = req.params;
 
-        const chat = await Chat.findOne({ _id: chatId, user: userId, isActive: true });
+        const chat = await Chat.findOne({ _id: chatId, user: userId, isActive: true }).lean();
 
         if (!chat) {
             return res.status(404).json({
@@ -242,7 +288,7 @@ export const updateChatTitle = async (req, res) => {
             { _id: chatId, user: userId, isActive: true },
             { title: title.trim() },
             { new: true }
-        );
+        ).lean();
 
         if (!chat) {
             return res.status(404).json({

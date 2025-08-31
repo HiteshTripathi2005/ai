@@ -37,6 +37,10 @@ const messageSchema = new mongoose.Schema({
       required: function() { return this.type === 'tool-result'; }
     }
   }],
+  raw: {
+    type: mongoose.Schema.Types.Mixed,
+    required: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

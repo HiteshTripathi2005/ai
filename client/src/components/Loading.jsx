@@ -2,7 +2,7 @@ import { Circles } from 'react-loader-spinner';
 
 const Loading = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-900">
+    <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-transparent">
       <div className="bg-white/60 dark:bg-zinc-950/60 backdrop-blur border border-zinc-200/70 dark:border-zinc-800/70 rounded-2xl p-8 shadow-sm">
         <div className="flex flex-col items-center gap-4">
           <Circles

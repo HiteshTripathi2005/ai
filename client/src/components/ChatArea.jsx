@@ -1,19 +1,126 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Copy, Check, User, Bot } from "lucide-react";
+import { Copy, Check, User, Bot, ChevronDown } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import Loading from './Loading';
+import ToolCallRenderer from './ToolCallRenderer';
 
 function MessageBubble({ msg }) {
   const isUser = msg.role === "user";
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    const text = (msg.parts || [])
-      .map((p) => (p.type === 'text' ? p.text : ''))
-      .join('');
+    let text = '';
+
+    if (isUser) {
+      text = (msg.parts || [])
+        .map((p) => (p.type === 'text' ? p.text : ''))
+        .join('');
+    } else {
+      // For assistant messages, use raw if available
+      if (msg.raw) {
+        // If raw has _steps, extract the final text from the last step
+        if (msg.raw._steps && Array.isArray(msg.raw._steps) && msg.raw._steps.length > 0) {
+          const lastStep = msg.raw._steps[msg.raw._steps.length - 1];
+          if (lastStep.content && Array.isArray(lastStep.content)) {
+            const textContent = lastStep.content.find(item => item.type === 'text' && item.text);
+            if (textContent && textContent.text) {
+              text = textContent.text;
+            }
+          }
+        }
+        
+        // Fallback: If raw is an object with text, use that
+        if (!text && typeof msg.raw === 'object' && msg.raw.text) {
+          text = msg.raw.text;
+        }
+        
+        // If raw is a string, treat it as text
+        if (!text && typeof msg.raw === 'string') {
+          text = msg.raw;
+        }
+      }
+      
+      // Fallback to parts if raw is not available or doesn't contain text
+      if (!text) {
+        text = (msg.parts || [])
+          .map((p) => (p.type === 'text' ? p.text : ''))
+          .join('');
+      }
+    }
+
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
+  };
+
+  const renderPart = (part, index) => {
+    switch (part.type) {
+      case 'text':
+        return isUser ? (
+          <div key={index} className="whitespace-pre-wrap">
+            {part.text}
+          </div>
+        ) : (
+          <ReactMarkdown key={index} remarkPlugins={[remarkGfm]}>
+            {part.text}
+          </ReactMarkdown>
+        );
+      
+      case 'tool-call':
+      case 'tool-result':
+        return <ToolCallRenderer key={index} part={part} index={index} />;
+      
+      default:
+        return null;
+    }
+  };
+
+  // For assistant messages, use raw if available
+  const renderAssistantContent = () => {
+    if (isUser) {
+      return (msg.parts || []).map((part, index) => renderPart(part, index));
+    }
+
+    // Check if raw data is available
+    if (msg.raw) {
+      // If raw has _steps, extract the final text from the last step
+      if (msg.raw._steps && Array.isArray(msg.raw._steps) && msg.raw._steps.length > 0) {
+        const lastStep = msg.raw._steps[msg.raw._steps.length - 1];
+        if (lastStep.content && Array.isArray(lastStep.content)) {
+          // Find the text content in the last step
+          const textContent = lastStep.content.find(item => item.type === 'text' && item.text);
+          if (textContent && textContent.text) {
+            return (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {textContent.text}
+              </ReactMarkdown>
+            );
+          }
+        }
+      }
+      
+      // Fallback: If raw is an object with text, use that
+      if (typeof msg.raw === 'object' && msg.raw.text) {
+        return (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {msg.raw.text}
+          </ReactMarkdown>
+        );
+      }
+      
+      // If raw is a string, treat it as text
+      if (typeof msg.raw === 'string') {
+        return (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {msg.raw}
+          </ReactMarkdown>
+        );
+      }
+    }
+
+    // Fallback to parts if raw is not available or doesn't contain text
+    return (msg.parts || []).map((part, index) => renderPart(part, index));
   };
 
   return (
@@ -46,19 +153,7 @@ function MessageBubble({ msg }) {
               ? "text-white" 
               : "text-gray-800 dark:text-gray-200 prose prose-sm prose-gray dark:prose-invert max-w-none"
           }`}>
-            {isUser ? (
-              <div className="whitespace-pre-wrap">
-                {(msg.parts || [])
-                  .map((p) => (p.type === 'text' ? p.text : ''))
-                  .join('')}
-              </div>
-            ) : (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {(msg.parts || [])
-                  .map((p) => (p.type === 'text' ? p.text : ''))
-                  .join('')}
-              </ReactMarkdown>
-            )}
+            {renderAssistantContent()}
           </div>
 
           {/* Timestamp - subtle */}
@@ -76,7 +171,7 @@ function MessageBubble({ msg }) {
   );
 }
 
-export default function ChatArea({ messages, status, isAuthenticated }) {
+export default function ChatArea({ messages, status, isAuthenticated, isLoadingMessages }) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
@@ -140,7 +235,7 @@ export default function ChatArea({ messages, status, isAuthenticated }) {
         className="flex-1 overflow-auto px-2 md:px-6 py-4 md:py-6 space-y-3 overscroll-contain"
         id="messages-root"
       >
-        {messages.length === 0 ? (
+        {messages.length === 0 && !isLoadingMessages ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-md mx-auto px-6">
               <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-600 dark:text-blue-400 mb-6">
@@ -156,6 +251,10 @@ export default function ChatArea({ messages, status, isAuthenticated }) {
                 }
               </p>
             </div>
+          </div>
+        ) : messages.length === 0 && isLoadingMessages ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loading />
           </div>
         ) : (
           messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)

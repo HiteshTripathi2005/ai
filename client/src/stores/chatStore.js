@@ -169,7 +169,7 @@ export const useChatStore = create((set, get) => ({
       setStatus("ready");
       
       // If we were on the default chat, refresh the chat list to get the new chat
-      if (currentChatId === "default-chat") {
+      
         try {
           await fetchChats();
           // Set the current chat to the most recent one
@@ -182,7 +182,7 @@ export const useChatStore = create((set, get) => ({
         } catch (error) {
           console.error('Failed to refresh chats after sending message:', error);
         }
-      }
+      
     }
   },
 
@@ -212,11 +212,6 @@ export const useChatStore = create((set, get) => ({
     setChatHistory(updatedChatHistory);
   },
 
-  handleNewChat: () => {
-    const { createChat } = get();
-    createChat();
-  },
-
   // Chat management functions
   fetchChats: async () => {
     try {
@@ -243,6 +238,14 @@ export const useChatStore = create((set, get) => ({
       console.error('Failed to create chat:', error);
       return { success: false, message: error.message };
     }
+  },
+
+  handleNewChat: async (navigate) => {
+    const result = await get().createChat('New Chat');
+    if (result && result.success && result.chat) {
+      navigate(`/chat/${result.chat._id}`);
+    }
+    return result;
   },
 
   selectChat: async (chatId) => {

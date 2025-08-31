@@ -6,6 +6,7 @@ import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import toast from 'react-hot-toast'
 import { useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 const HomePage = () => {
   const { isAuthenticated } = useAuthStore();
@@ -23,12 +24,13 @@ const HomePage = () => {
     deleteChat,
     selectChat,
     fetchChats,
-    setCurrentChatId,
-    setMessages,
     setSidebarOpen, 
     setSidebarW,
     toggleSidebar
   } = useChatStore();
+
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSelectChat = async (chatId) => {
     await selectChat(chatId);
@@ -38,6 +40,7 @@ const HomePage = () => {
     if (chatHistory.length > 1) {
       deleteChat(chatId);
     }
+    navigate('/');
   };
 
   useEffect(() => {
@@ -45,6 +48,23 @@ const HomePage = () => {
       fetchChats();
     }
   }, [isAuthenticated, fetchChats]);
+
+  // Handle URL-based chat loading
+  useEffect(() => {
+    const path = location.pathname;
+    const chatIdMatch = path.match(/^\/chat\/(.+)$/);
+    if (chatIdMatch && chatIdMatch[1]) {
+      // Only load if it's different from current chat
+      if (chatIdMatch[1] !== currentChatId) {
+        selectChat(chatIdMatch[1]);
+      }
+    } else if (path === '/' && currentChatId) {
+      // If on home page and we have a current chat, clear it to show welcome
+      // This is optional - you might want to keep the last chat visible
+      // setCurrentChatId(null);
+      // setMessages([]);
+    }
+  }, [location.pathname, currentChatId, selectChat]);
 
   return (
     <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
@@ -54,7 +74,7 @@ const HomePage = () => {
           setWidth={setSidebarW}
           open={sidebarOpen}
           setOpen={setSidebarOpen}
-          onNewChat={isAuthenticated ? handleNewChat : () => toast.error('Please login to create new chats')}
+          onNewChat={isAuthenticated ? () => handleNewChat(navigate) : () => toast.error('Please login to create new chats')}
           onDeleteChat={handleDeleteChat}
           onSelectChat={handleSelectChat}
           currentChatId={currentChatId}

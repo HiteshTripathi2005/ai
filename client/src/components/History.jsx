@@ -1,11 +1,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import clsx from "clsx";
 import { ChevronLeft, ChevronRight, Plus, Settings, MessageCircle, Trash2 } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 
 function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSelectChat, currentChatId, chatHistory, isAuthenticated }) {
   const MIN_W = 220;
   const MAX_W = 520;
   const handleRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handle = handleRef.current;
@@ -85,7 +87,9 @@ function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSe
                   )}
                 >
                   <button
-                    onClick={() => onSelectChat(chat._id || chat.id)}
+                    onClick={() => {
+                      navigate(`/chat/${chat._id || chat.id}`);
+                    }}
                     className="w-full text-left truncate px-3 py-2 text-sm hover:bg-white dark:hover:bg-zinc-800/80"
                   >
                     <div className="flex items-center gap-2">
