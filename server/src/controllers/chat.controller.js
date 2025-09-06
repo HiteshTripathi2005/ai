@@ -1,6 +1,6 @@
 import { google } from '@ai-sdk/google';
 import { stepCountIs, streamText } from 'ai';
-import { timeTool } from '../utils/tools.js';
+import { getMergedTools } from '../utils/tools.js';
 import { systemPrompt } from '../utils/systemPrompt.js';
 import Chat from '../models/Chat.js';
 
@@ -43,18 +43,24 @@ export const chat = async (req, res) => {
         await chat.save();
 
         let accumulatedParts = [];
-        let tempText = '';
+
+        // Load merged tools (local + MCP)
+        const { tools: mergedTools, close: closeMcp } = await getMergedTools();
 
         const result = await streamText({
             model: google('gemini-2.5-flash'),
             system: systemPrompt,
             prompt,
             stopWhen: stepCountIs(10),
-            tools: {timeTool},
+            tools: mergedTools,
             onChunk: (chunk) => {
                 if (chunk.chunk) {
                     if (chunk.chunk.type === 'text-delta' && chunk.chunk.text) {
-                        tempText += chunk.chunk.text;
+                        // Add text chunks immediately to preserve order
+                        accumulatedParts.push({
+                            type: 'text',
+                            text: chunk.chunk.text
+                        });
                     } else if (chunk.chunk.type === 'tool-call' && chunk.chunk.toolName && chunk.chunk.input) {
                         accumulatedParts.push({
                             type: 'tool-call',
@@ -76,8 +82,7 @@ export const chat = async (req, res) => {
         let assistantMessage = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            parts: [],
-            raw: null
+            parts: []
         };
 
         // Get the original response
@@ -86,25 +91,8 @@ export const chat = async (req, res) => {
         // Save the assistant message after the stream is complete
         result.text.then(async (finalText) => {
             try {
-                if (tempText) {
-                    accumulatedParts.push({
-                        type: 'text',
-                        text: tempText
-                    });
-                }
+                // Parts are already accumulated in the correct order during streaming
                 assistantMessage.parts = accumulatedParts;
-
-                // Attempt to attach the raw AI response to the message. If the
-                // full result object is not serializable, fall back to storing
-                // the final text under raw.
-                try {
-                    // Some SDK responses may contain circular refs; attempt a
-                    // safe serialization by JSON.stringify then parse. If that
-                    // fails, use finalText as the raw payload.
-                    assistantMessage.raw = JSON.parse(JSON.stringify(result)) || { text: finalText };
-                } catch (serializeError) {
-                    assistantMessage.raw = { text: finalText };
-                }
                 chat.messages.push(assistantMessage);
                 await chat.save();
                 console.log('Assistant message saved to database');
@@ -143,6 +131,16 @@ export const chat = async (req, res) => {
             }
         }).catch(error => {
             console.error('Error getting final text:', error);
+        });
+
+        // Set up cleanup after response is finished
+        res.on('finish', async () => {
+            try {
+                await closeMcp();
+                console.log('MCP connections closed successfully');
+            } catch (closeError) {
+                console.warn('Error closing MCP connections:', closeError);
+            }
         });
 
         return originalResponse;

@@ -9,51 +9,6 @@ function MessageBubble({ msg }) {
   const isUser = msg.role === "user";
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    let text = '';
-
-    if (isUser) {
-      text = (msg.parts || [])
-        .map((p) => (p.type === 'text' ? p.text : ''))
-        .join('');
-    } else {
-      // For assistant messages, use raw if available
-      if (msg.raw) {
-        // If raw has _steps, extract the final text from the last step
-        if (msg.raw._steps && Array.isArray(msg.raw._steps) && msg.raw._steps.length > 0) {
-          const lastStep = msg.raw._steps[msg.raw._steps.length - 1];
-          if (lastStep.content && Array.isArray(lastStep.content)) {
-            const textContent = lastStep.content.find(item => item.type === 'text' && item.text);
-            if (textContent && textContent.text) {
-              text = textContent.text;
-            }
-          }
-        }
-        
-        // Fallback: If raw is an object with text, use that
-        if (!text && typeof msg.raw === 'object' && msg.raw.text) {
-          text = msg.raw.text;
-        }
-        
-        // If raw is a string, treat it as text
-        if (!text && typeof msg.raw === 'string') {
-          text = msg.raw;
-        }
-      }
-      
-      // Fallback to parts if raw is not available or doesn't contain text
-      if (!text) {
-        text = (msg.parts || [])
-          .map((p) => (p.type === 'text' ? p.text : ''))
-          .join('');
-      }
-    }
-
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1200);
-  };
-
   const renderPart = (part, index) => {
     switch (part.type) {
       case 'text':
@@ -66,109 +21,81 @@ function MessageBubble({ msg }) {
             {part.text}
           </ReactMarkdown>
         );
-      
+
       case 'tool-call':
       case 'tool-result':
+        // Tool cards are rendered outside of the bubble; ToolCallRenderer
+        // returns the card content itself, but the wrapper is added where
+        // we place the card in the sequence below.
         return <ToolCallRenderer key={index} part={part} index={index} />;
-      
+
       default:
         return null;
     }
   };
 
-  // For assistant messages, use raw if available
-  const renderAssistantContent = () => {
-    if (isUser) {
-      return (msg.parts || []).map((part, index) => renderPart(part, index));
-    }
-
-    // Check if raw data is available
-    if (msg.raw) {
-      // If raw has _steps, extract the final text from the last step
-      if (msg.raw._steps && Array.isArray(msg.raw._steps) && msg.raw._steps.length > 0) {
-        const lastStep = msg.raw._steps[msg.raw._steps.length - 1];
-        if (lastStep.content && Array.isArray(lastStep.content)) {
-          // Find the text content in the last step
-          const textContent = lastStep.content.find(item => item.type === 'text' && item.text);
-          if (textContent && textContent.text) {
-            return (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {textContent.text}
-              </ReactMarkdown>
-            );
-          }
-        }
-      }
-      
-      // Fallback: If raw is an object with text, use that
-      if (typeof msg.raw === 'object' && msg.raw.text) {
-        return (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {msg.raw.text}
-          </ReactMarkdown>
-        );
-      }
-      
-      // If raw is a string, treat it as text
-      if (typeof msg.raw === 'string') {
-        return (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {msg.raw}
-          </ReactMarkdown>
-        );
-      }
-    }
-
-    // Fallback to parts if raw is not available or doesn't contain text
-    return (msg.parts || []).map((part, index) => renderPart(part, index));
-  };
-
-  return (
-    <div className={`w-full flex mb-6 ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`group relative max-w-[min(85%,700px)] ${
-        isUser ? "ml-12" : "mr-12"
-      }`}>
-        {/* Avatar */}
-        <div className={`flex items-center mb-2 ${isUser ? "justify-end" : "justify-start"}`}>
-          <div className={`inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm ${
-            isUser 
-              ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" 
-              : "bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-300"
-          }`}>
-            {isUser ? <User className="h-4 w-4"/> : <Bot className="h-4 w-4"/>}
-          </div>
-        </div>
-
-        {/* Message bubble */}
-        <div className={`relative ${
-          isUser
-            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
-            : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm"
-        } rounded-2xl px-5 py-4`}>
-          
-
-          {/* Message content */}
-          <div className={`text-sm leading-relaxed ${
-            isUser 
-              ? "text-white" 
-              : "text-gray-800 dark:text-gray-200 prose prose-sm prose-gray dark:prose-invert max-w-none"
-          }`}>
-            {renderAssistantContent()}
+  // Helper to render a regular message bubble for a given array of text parts
+  const renderBubble = (textParts, keySuffix) => {
+    return (
+      <div key={`bubble-${msg.id}-${keySuffix}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
+        <div className={`group relative max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
+          {/* Avatar */}
+          <div className={`flex items-center mb-2 ${isUser ? "justify-end" : "justify-start"}`}>
+            <div className={`inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm ${isUser ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white" : "bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 text-gray-700 dark:text-gray-300"}`}>
+              {isUser ? <User className="h-4 w-4"/> : <Bot className="h-4 w-4"/>}
+            </div>
           </div>
 
-          {/* Timestamp - subtle */}
-          <div className={`text-xs mt-3 ${
-            isUser ? "text-blue-100" : "text-gray-500 dark:text-gray-400"
-          }`}>
-            {new Intl.DateTimeFormat(undefined, {
-              hour: "2-digit",
-              minute: "2-digit"
-            }).format(new Date(parseInt(msg.id) || Date.now()))}
+          <div className={`relative ${isUser ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25" : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm"} rounded-2xl px-5 py-4`}>
+            <div className={`text-sm leading-relaxed ${isUser ? "text-white" : "text-gray-800 dark:text-gray-200 prose prose-sm prose-gray dark:prose-invert max-w-none"}`}>
+              {textParts.map((part, idx) => renderPart(part, `inner-${keySuffix}-${idx}`))}
+            </div>
+
+            <div className={`text-xs mt-3 ${isUser ? "text-blue-100" : "text-gray-500 dark:text-gray-400"}`}>
+              {new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(parseInt(msg.id) || Date.now()))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Build sequence preserving original order: flush text segments into bubbles,
+  // and render tool cards as separate elements in the stream.
+  const nodes = [];
+  const parts = msg.parts || [];
+  let textBuffer = [];
+  let seq = 0;
+
+  const flushTextBuffer = () => {
+    if (textBuffer.length > 0) {
+      nodes.push(renderBubble(textBuffer, seq));
+      seq += 1;
+      textBuffer = [];
+    }
+  };
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part.type === 'text') {
+      textBuffer.push(part);
+    } else if (part.type === 'tool-call' || part.type === 'tool-result') {
+      // Flush any accumulated text first, then render the tool card aligned to the same side
+      flushTextBuffer();
+      nodes.push(
+        <div key={`tool-${msg.id}-${i}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
+          <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
+            {renderPart(part, i)}
+          </div>
+        </div>
+      );
+      seq += 1;
+    }
+  }
+
+  flushTextBuffer();
+
+  return <>{nodes}</>;
 }
 
 export default function ChatArea({ messages, status, isAuthenticated, isLoadingMessages }) {
