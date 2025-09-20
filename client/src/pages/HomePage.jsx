@@ -49,6 +49,21 @@ const HomePage = () => {
     }
   }, [isAuthenticated, fetchChats]);
 
+  // Reset sidebar width on mobile screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768 && sidebarW > 0) {
+        setSidebarW(0);
+      }
+    };
+
+    // Check on mount
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarW, setSidebarW]);
+
   // Handle URL-based chat loading
   useEffect(() => {
     const path = location.pathname;
@@ -68,25 +83,24 @@ const HomePage = () => {
 
   return (
     <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
-      <div className="hidden md:block" style={{ width: sidebarW }}>
-        <History
-          width={sidebarW}
-          setWidth={setSidebarW}
-          open={sidebarOpen}
-          setOpen={setSidebarOpen}
-          onNewChat={isAuthenticated ? () => handleNewChat(navigate) : () => toast.error('Please login to create new chats')}
-          onDeleteChat={handleDeleteChat}
-          onSelectChat={handleSelectChat}
-          currentChatId={currentChatId}
-          chatHistory={chatHistory}
-          isAuthenticated={isAuthenticated}
-        />
-      </div>
+      {/* History Component - Responsive positioning */}
+      <History
+        width={sidebarW}
+        setWidth={setSidebarW}
+        open={sidebarOpen}
+        setOpen={setSidebarOpen}
+        onNewChat={isAuthenticated ? () => handleNewChat(navigate) : () => toast.error('Please login to create new chats')}
+        onDeleteChat={handleDeleteChat}
+        onSelectChat={handleSelectChat}
+        currentChatId={currentChatId}
+        chatHistory={chatHistory}
+        isAuthenticated={isAuthenticated}
+      />
 
-      <main className="flex flex-col w-full relative h-full">
+      <main className="flex flex-col w-full relative h-full lg:flex-1 transition-all duration-300">
         {/* Fixed Header */}
         <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950">
-          <Header width={sidebarW} setWidth={setSidebarW} />
+          <Header width={sidebarW} setWidth={setSidebarW} setOpen={setSidebarOpen} />
         </div>
         {/* Scrollable ChatArea */}
         <div className="flex-1 flex-col-reverse overflow-y-auto">

@@ -81,15 +81,6 @@ export const useChatStore = create((set, get) => ({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Create assistant placeholder to stream into
-      const assistantMsgTemplate = {
-        id: assistantId,
-        role: "assistant",
-        parts: [{ type: "text", text: "" }]
-      };
-      const updatedMessages = [...get().messages, assistantMsgTemplate];
-      setMessages(updatedMessages);
-
       // Handle streaming response
       const reader = response.body.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -119,9 +110,17 @@ export const useChatStore = create((set, get) => ({
 
             try {
               const evt = JSON.parse(payload);
-              // Vercel AI SDK emits events like { type: 'text-delta', textDelta: '...' }
-              if (evt?.type === "text-delta" && typeof evt.textDelta === "string") {
-                get().upsertAssistantText(assistantId, evt.textDelta);
+              // Handle different event types from the AI SDK
+              if (evt?.type === "text-delta" && typeof evt.delta === "string") {
+                get().upsertAssistantText(assistantId, evt.delta);
+              } else if (evt?.type === "tool-input-available" && evt.toolName && evt.input) {
+                // Handle complete tool input
+                const toolPart = {
+                  type: "tool-call",
+                  toolName: evt.toolName,
+                  input: evt.input
+                };
+                get().upsertAssistantToolPart(assistantId, toolPart);
               } else if (typeof evt === "string") {
                 get().upsertAssistantText(assistantId, evt);
               } else if (evt?.delta && typeof evt.delta === "string") {
@@ -146,8 +145,16 @@ export const useChatStore = create((set, get) => ({
           if (payload && payload !== "[DONE]") {
             try {
               const evt = JSON.parse(payload);
-              if (evt?.type === "text-delta" && typeof evt.textDelta === "string") {
-                get().upsertAssistantText(assistantId, evt.textDelta);
+              if (evt?.type === "text-delta" && typeof evt.delta === "string") {
+                get().upsertAssistantText(assistantId, evt.delta);
+              } else if (evt?.type === "tool-input-available" && evt.toolName && evt.input) {
+                // Handle complete tool input
+                const toolPart = {
+                  type: "tool-call",
+                  toolName: evt.toolName,
+                  input: evt.input
+                };
+                get().upsertAssistantToolPart(assistantId, toolPart);
               } else if (typeof evt === "string") {
                 get().upsertAssistantText(assistantId, evt);
               } else if (evt?.delta && typeof evt.delta === "string") {
@@ -167,11 +174,12 @@ export const useChatStore = create((set, get) => ({
       toast.error(`Failed to send message: ${errorMessage}`);
     } finally {
       setStatus("ready");
-      
+
       // If we were on the default chat, refresh the chat list to get the new chat
-      
+      if (currentChatId === "default-chat") {
         try {
-          await fetchChats();
+          // Refresh chats to get the newly created chat
+          await get().fetchChats();
           // Set the current chat to the most recent one
           const updatedChats = get().chatHistory;
           if (updatedChats.length > 0) {
@@ -182,7 +190,7 @@ export const useChatStore = create((set, get) => ({
         } catch (error) {
           console.error('Failed to refresh chats after sending message:', error);
         }
-      
+      }
     }
   },
 
@@ -192,27 +200,95 @@ export const useChatStore = create((set, get) => ({
 
     const { messages, setMessages, chatHistory, setChatHistory, currentChatId } = get();
 
+    let messageExists = false;
     const updatedMessages = messages.map((m) => {
-      if (m.id !== assistantId) return m;
-      const prev = (m.parts?.[0]?.text || "");
-      return {
-        ...m,
-        parts: [{ type: "text", text: prev + textDelta }],
-      };
+      if (m.id === assistantId) {
+        messageExists = true;
+        const existingParts = m.parts || [];
+        const lastPart = existingParts[existingParts.length - 1];
+
+        // If the last part is text, append to it
+        if (lastPart && lastPart.type === 'text') {
+          const updatedParts = [...existingParts];
+          updatedParts[updatedParts.length - 1] = {
+            ...lastPart,
+            text: lastPart.text + textDelta
+          };
+          return {
+            ...m,
+            parts: updatedParts
+          };
+        } else {
+          // If the last part is not text (or no parts exist), add a new text part
+          return {
+            ...m,
+            parts: [...existingParts, { type: "text", text: textDelta }]
+          };
+        }
+      }
+      return m;
     });
+
+    // If message doesn't exist, create it
+    if (!messageExists) {
+      const newMessage = {
+        id: assistantId,
+        role: "assistant",
+        parts: [{ type: "text", text: textDelta }]
+      };
+      updatedMessages.push(newMessage);
+    }
 
     setMessages(updatedMessages);
 
     // Update the current chat in chatHistory
-    const updatedChatHistory = chatHistory.map(chat => 
-      (chat._id || chat.id) === currentChatId 
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === currentChatId
         ? { ...chat, messages: updatedMessages }
         : chat
     );
     setChatHistory(updatedChatHistory);
   },
 
-  // Chat management functions
+  // Append tool part to the assistant message with the given id
+  upsertAssistantToolPart: (assistantId, toolPart) => {
+    if (!toolPart) return;
+
+    const { messages, setMessages, chatHistory, setChatHistory, currentChatId } = get();
+
+    let messageExists = false;
+    const updatedMessages = messages.map((m) => {
+      if (m.id === assistantId) {
+        messageExists = true;
+        const existingParts = m.parts || [];
+        return {
+          ...m,
+          parts: [...existingParts, toolPart],
+        };
+      }
+      return m;
+    });
+
+    // If message doesn't exist, create it
+    if (!messageExists) {
+      const newMessage = {
+        id: assistantId,
+        role: "assistant",
+        parts: [toolPart]
+      };
+      updatedMessages.push(newMessage);
+    }
+
+    setMessages(updatedMessages);
+
+    // Update the current chat in chatHistory
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === currentChatId
+        ? { ...chat, messages: updatedMessages }
+        : chat
+    );
+    setChatHistory(updatedChatHistory);
+  },  // Chat management functions
   fetchChats: async () => {
     try {
       const response = await api.get('/chat/chats');

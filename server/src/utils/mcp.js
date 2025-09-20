@@ -86,8 +86,9 @@ export async function mcpToolsFromSmithery(urls) {
     const baseUrls = urls && urls.length > 0
         ? urls
         : [
-                // "https://server.smithery.ai/exa/mcp",
-                "https://server.smithery.ai/@nickclyde/duckduckgo-mcp-server/mcp",
+                "https://server.smithery.ai/exa/mcp",
+                "https://server.smithery.ai/@esshka/okx-mcp/mcp",
+                // "https://server.smithery.ai/@nickclyde/duckduckgo-mcp-server/mcp",
             ];
     // Append api_key and profile to each URL
     const defaultUrl = baseUrls.map(u => {
