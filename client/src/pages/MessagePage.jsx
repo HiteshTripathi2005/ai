@@ -15,9 +15,8 @@ const MessagePage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
-  // Sidebar state
+  // Sidebar state - simplified to just open/close
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarW, setSidebarW] = useState(320);
 
   const {
     messages,
@@ -53,11 +52,16 @@ const MessagePage = () => {
     }
   }, [isAuthenticated, fetchChats]);
 
-  // Reset sidebar width on mobile screens
+  // Reset sidebar on mobile screens - simplified
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 768 && sidebarW > 0) {
-        setSidebarW(0);
+      if (window.innerWidth >= 1024 && !sidebarOpen) {
+        // On desktop, ensure sidebar can be opened
+        return;
+      }
+      if (window.innerWidth < 1024 && sidebarOpen) {
+        // Close sidebar when switching to mobile
+        setSidebarOpen(false);
       }
     };
 
@@ -66,7 +70,7 @@ const MessagePage = () => {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [sidebarW]);
+  }, [sidebarOpen]);
 
   const handleSelectChat = async (selectedChatId) => {
     await selectChat(selectedChatId);
@@ -124,8 +128,6 @@ const MessagePage = () => {
 
   return (
     <SidebarLayout
-      sidebarWidth={sidebarW}
-      setSidebarWidth={setSidebarW}
       sidebarOpen={sidebarOpen}
       setSidebarOpen={setSidebarOpen}
       onNewChat={handleNewChatClick}
@@ -146,7 +148,7 @@ const MessagePage = () => {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex-1">
-            <Header />
+            <Header setOpen={setSidebarOpen} />
           </div>
         </div>
       </div>

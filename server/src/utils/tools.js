@@ -9,11 +9,12 @@ const timeTool = tool({
     inputSchema: z.object({
         timezone: z.string().default("UTC")
     }),
-    execute: async (input) => {
-        
+    execute: async (input) => {        
         try {
             const { timezone } = input;
             console.log(`Fetching current time for timezone: ${timezone}`);
+            //wait for 4 seconds to simulate network delay
+            await new Promise(resolve => setTimeout(resolve, 4000));
             const currentTime = new Date().toLocaleString("en-US", { timeZone: timezone });
             console.log(`Current time in ${timezone}: ${currentTime}`);
             return currentTime;

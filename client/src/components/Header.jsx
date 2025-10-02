@@ -34,10 +34,10 @@ export default function Header({ width, setWidth, setOpen }) {
   return (
     <header className="h-14 border-b border-zinc-200/60 dark:border-zinc-800/60 px-3 md:px-5 flex items-center justify-between bg-white/60 dark:bg-zinc-950/60 backdrop-blur">
       <div className="flex items-center gap-5">
-        <button className="md:hidden cursor-pointer" onClick={() => setOpen(prev => !prev)} aria-label="Open history">
+        <button className="lg:hidden cursor-pointer" onClick={() => setOpen(prev => !prev)} aria-label="Open history">
           <Menu className="h-[18px] w-[18px]"/>
         </button>
-        <button className="hidden md:block cursor-pointer" onClick={() => {setWidth(width === 0 ? 280 : 0);console.log(width);}} aria-label="Toggle sidebar">
+        <button className="hidden lg:block cursor-pointer" onClick={() => setOpen(prev => !prev)} aria-label="Toggle sidebar">
           <Menu className="h-[18px] w-[18px]"/>
         </button>
         <div className="text-sm text-zinc-500">AI Chat</div>

@@ -1,10 +1,9 @@
 import React from 'react';
+import { Menu } from 'lucide-react';
 import History from './History';
 
 const SidebarLayout = ({
   children,
-  sidebarWidth,
-  setSidebarWidth,
   sidebarOpen,
   setSidebarOpen,
   onNewChat,
@@ -16,10 +15,8 @@ const SidebarLayout = ({
 }) => {
   return (
     <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
-      {/* History Component - Responsive positioning */}
+      {/* History Component */}
       <History
-        width={sidebarWidth}
-        setWidth={setSidebarWidth}
         open={sidebarOpen}
         setOpen={setSidebarOpen}
         onNewChat={onNewChat}
@@ -31,7 +28,15 @@ const SidebarLayout = ({
       />
 
       {/* Main Content Area */}
-      <main className="flex flex-col w-full relative h-full lg:flex-1 transition-all duration-300">
+      <main className="flex flex-col flex-1 relative h-full transition-all duration-300">
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="absolute top-4 left-4 z-10 p-2 rounded bg-zinc-900 text-white hover:bg-zinc-700 shadow"
+          >
+            <Menu size={20} />
+          </button>
+        )}
         {children}
       </main>
     </div>

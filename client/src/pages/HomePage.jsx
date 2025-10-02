@@ -94,10 +94,6 @@ const HomePage = () => {
       chatHistory={chatHistory}
       isAuthenticated={isAuthenticated}
     >
-      {/* Fixed Header */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950">
-        <Header width={sidebarW} setWidth={setSidebarW} setOpen={setSidebarOpen} />
-      </div>
       {/* Scrollable ChatArea */}
       <div className="flex-1 flex-col-reverse overflow-y-auto">
         <ChatArea 
