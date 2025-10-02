@@ -7,6 +7,34 @@ import ToolCallRenderer from './ToolCallRenderer';
 
 function MessageBubble({ msg }) {
   const isUser = msg.role === "user";
+  const [copied, setCopied] = useState(false);
+
+  // Extract timestamp from message id
+  const getTimestamp = () => {
+    const timestamp = parseInt(msg.id.replace('-ai', ''));
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Get all text content from message parts
+  const getMessageText = () => {
+    return msg.parts
+      ?.filter(part => part.type === 'text')
+      ?.map(part => part.text)
+      ?.join(' ') || '';
+  };
+
+  const handleCopy = async () => {
+    const text = getMessageText();
+    if (text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy text:', err);
+      }
+    }
+  };
 
   const renderPart = (part, index) => {
     if (part.type === 'text') {
@@ -23,6 +51,17 @@ function MessageBubble({ msg }) {
                   </ReactMarkdown>
                 )}
               </div>
+            </div>
+            {/* Time and Copy Button */}
+            <div className={`flex items-center gap-2 mt-1 text-xs text-zinc-500 dark:text-zinc-400 ${isUser ? "justify-end" : "justify-start"}`}>
+              <span>{getTimestamp()}</span>
+              <button
+                onClick={handleCopy}
+                className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                title="Copy message"
+              >
+                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              </button>
             </div>
           </div>
         </div>

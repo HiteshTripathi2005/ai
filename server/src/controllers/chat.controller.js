@@ -72,11 +72,12 @@ export const chat = async (req, res) => {
                 // Add tool calls if present
                 if (step.toolCalls && step.toolCalls.length > 0) {
                     for (const toolCall of step.toolCalls) {
+                        console.log('Tool call object:', JSON.stringify(toolCall, null, 2));
                         assistantMessage.parts.push({
                             type: 'tool-call',
                             toolCallId: toolCall.toolCallId,
                             toolName: toolCall.toolName,
-                            args: toolCall.args || {}
+                            args: toolCall.args || toolCall.input || toolCall.arguments || {}
                         });
                     }
                 }

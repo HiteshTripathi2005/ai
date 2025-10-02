@@ -30,7 +30,7 @@ const messageSchema = new mongoose.Schema({
     },
     args: {
       type: mongoose.Schema.Types.Mixed,
-      required: function() { return this.type === 'tool-call'; }
+      default: {}
     },
     result: {
       type: mongoose.Schema.Types.Mixed
