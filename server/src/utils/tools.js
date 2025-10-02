@@ -10,11 +10,17 @@ const timeTool = tool({
         timezone: z.string().default("UTC")
     }),
     execute: async (input) => {
-        const { timezone } = input;
-        console.log(`Fetching current time for timezone: ${timezone}`);
-        const currentTime = new Date().toLocaleString("en-US", { timeZone: timezone });
-        console.log(`Current time in ${timezone}: ${currentTime}`);
-        return currentTime;
+        
+        try {
+            const { timezone } = input;
+            console.log(`Fetching current time for timezone: ${timezone}`);
+            const currentTime = new Date().toLocaleString("en-US", { timeZone: timezone });
+            console.log(`Current time in ${timezone}: ${currentTime}`);
+            return currentTime;
+        } catch (error) {
+            console.error(`Error fetching current time: ${error.message}`);
+            throw error;
+        }
     }
 })
 

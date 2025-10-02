@@ -36,7 +36,17 @@ function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSe
   const handleRef = useRef(null);
   const navigate = useNavigate();
   const [isDragging, setIsDragging] = useState(false);
+  const [dragWidth, setDragWidth] = useState(width);
+  const dragWidthRef = useRef(width);
   const { isMobile, isTablet, isDesktop } = useScreenSize();
+
+  // Sync dragWidth with width when not dragging
+  useEffect(() => {
+    if (!isDragging) {
+      setDragWidth(width);
+      dragWidthRef.current = width;
+    }
+  }, [width, isDragging]);
 
   // Desktop drag resize functionality
   useEffect(() => {
@@ -48,18 +58,24 @@ function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSe
 
     const onMouseMove = (e) => {
       const delta = e.clientX - startX;
-      let next = Math.min(MAX_W, Math.max(MIN_W, startW + delta));
-      setWidth(next);
+      const next = Math.min(MAX_W, Math.max(MIN_W, startW + delta));
+      dragWidthRef.current = next;
+      setDragWidth(next);
     };
+
     const onMouseUp = () => {
       setIsDragging(false);
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = '';
+
+      // Update parent state only when drag ends
+      setWidth(dragWidthRef.current);
     };
+
     const onMouseDown = (e) => {
       startX = e.clientX;
-      startW = width;
+      startW = dragWidthRef.current;
       setIsDragging(true);
       document.body.style.cursor = 'col-resize';
       document.addEventListener("mousemove", onMouseMove);
@@ -68,7 +84,7 @@ function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSe
 
     handle.addEventListener("mousedown", onMouseDown);
     return () => handle.removeEventListener("mousedown", onMouseDown);
-  }, [width, setWidth]);
+  }, [setWidth, isDesktop]);
 
   const handleNewChat = () => {
     onNewChat();
@@ -197,7 +213,7 @@ function History({ width, setWidth, open, setOpen, onNewChat, onDeleteChat, onSe
 
       {/* Tablet/Desktop Sidebar */}
       <aside
-        style={{ width: open ? width : 0 }}
+        style={{ width: open ? dragWidth : 0 }}
         className={clsx(
           "hidden md:block relative h-full flex-shrink-0 border-r border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 transition-all duration-300 ease-in-out overflow-hidden",
           // Tablet positioning

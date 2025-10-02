@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '../components/Header';
 import ChatArea from '../components/ChatArea';
 import Composer from '../components/Composer';
+import SidebarLayout from '../components/SidebarLayout';
 import Loading from '../components/Loading';
 import { useChatStore } from '../stores/chatStore';
 import { useAuthStore } from '../stores/authStore';
@@ -14,7 +15,9 @@ const MessagePage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
 
-  
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarW, setSidebarW] = useState(320);
 
   const {
     messages,
@@ -25,7 +28,11 @@ const MessagePage = () => {
     selectChat,
     fetchChats,
     setCurrentChatId,
-    setMessages
+    setMessages,
+    chatHistory,
+    currentChatId,
+    handleNewChat,
+    deleteChat
   } = useChatStore();
 
   useEffect(() => {
@@ -46,6 +53,35 @@ const MessagePage = () => {
     }
   }, [isAuthenticated, fetchChats]);
 
+  // Reset sidebar width on mobile screens
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768 && sidebarW > 0) {
+        setSidebarW(0);
+      }
+    };
+
+    // Check on mount
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarW]);
+
+  const handleSelectChat = async (selectedChatId) => {
+    await selectChat(selectedChatId);
+    navigate(`/chat/${selectedChatId}`);
+  };
+
+  const handleDeleteChat = (deleteChatId) => {
+    if (chatHistory.length > 1) {
+      deleteChat(deleteChatId);
+      if (deleteChatId === chatId) {
+        navigate('/');
+      }
+    }
+  };
+
   const handleSendMessage = async (message) => {
     if (!isAuthenticated) {
       toast.error('Please login to send messages');
@@ -56,6 +92,14 @@ const MessagePage = () => {
 
   const handleBackToHome = () => {
     navigate('/');
+  };
+
+  const handleNewChatClick = () => {
+    if (isAuthenticated) {
+      handleNewChat(navigate);
+    } else {
+      toast.error('Please login to create new chats');
+    }
   };
 
   if (!isAuthenticated) {
@@ -79,7 +123,18 @@ const MessagePage = () => {
   }
 
   return (
-    <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex flex-col">
+    <SidebarLayout
+      sidebarWidth={sidebarW}
+      setSidebarWidth={setSidebarW}
+      sidebarOpen={sidebarOpen}
+      setSidebarOpen={setSidebarOpen}
+      onNewChat={handleNewChatClick}
+      onDeleteChat={handleDeleteChat}
+      onSelectChat={handleSelectChat}
+      currentChatId={currentChatId}
+      chatHistory={chatHistory}
+      isAuthenticated={isAuthenticated}
+    >
       {/* Header with back button */}
       <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950 border-b border-zinc-200/60 dark:border-zinc-800/60">
         <div className="flex items-center gap-4 px-4 py-3">
@@ -116,7 +171,7 @@ const MessagePage = () => {
           />
         </div>
       </div>
-    </div>
+    </SidebarLayout>
   );
 };
 

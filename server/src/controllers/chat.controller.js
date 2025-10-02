@@ -42,7 +42,12 @@ export const chat = async (req, res) => {
         chat.messages.push(userMessage);
         await chat.save();
 
-        let accumulatedParts = [];
+        // Prepare assistant message structure
+        const assistantMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            parts: []
+        };
 
         // Load merged tools (local + MCP)
         const { tools: mergedTools, close: closeMcp } = await getMergedTools();
@@ -53,37 +58,43 @@ export const chat = async (req, res) => {
             prompt,
             stopWhen: stepCountIs(10),
             tools: mergedTools,
-            onChunk: (chunk) => {
-                if (chunk.chunk) {
-                    if (chunk.chunk.type === 'text-delta' && chunk.chunk.text) {
-                        // Add text chunks immediately to preserve order
-                        accumulatedParts.push({
-                            type: 'text',
-                            text: chunk.chunk.text
-                        });
-                    } else if (chunk.chunk.type === 'tool-call' && chunk.chunk.toolName && chunk.chunk.input) {
-                        accumulatedParts.push({
+            onStepFinish: async (step) => {
+                console.log('Step finished:', 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
+                
+                // Add text part if there's text and it's not empty
+                if (step.text && step.text.trim()) {
+                    assistantMessage.parts.push({
+                        type: 'text',
+                        text: step.text
+                    });
+                }
+                
+                // Add tool calls if present
+                if (step.toolCalls && step.toolCalls.length > 0) {
+                    for (const toolCall of step.toolCalls) {
+                        assistantMessage.parts.push({
                             type: 'tool-call',
-                            toolName: chunk.chunk.toolName,
-                            input: chunk.chunk.input
+                            toolCallId: toolCall.toolCallId,
+                            toolName: toolCall.toolName,
+                            args: toolCall.args || {}
                         });
-                    } else if (chunk.chunk.type === 'tool-result' && chunk.chunk.toolCallId && chunk.chunk.result) {
-                        accumulatedParts.push({
-                            type: 'tool-result',
-                            toolCallId: chunk.chunk.toolCallId,
-                            result: chunk.chunk.result
-                        });
+                    }
+                }
+                
+                // Add tool results if present
+                if (step.toolResults && step.toolResults.length > 0) {
+                    for (const toolResult of step.toolResults) {
+                        // Find the corresponding tool call part and update it with result
+                        const toolCallPart = assistantMessage.parts.find(
+                            p => p.type === 'tool-call' && p.toolCallId === toolResult.toolCallId
+                        );
+                        if (toolCallPart) {
+                            toolCallPart.result = toolResult.result;
+                        }
                     }
                 }
             }
         });
-
-        // Prepare assistant message
-        let assistantMessage = {
-            id: (Date.now() + 1).toString(),
-            role: 'assistant',
-            parts: []
-        };
 
         // Get the original response
         const originalResponse = result.pipeUIMessageStreamToResponse(res);
@@ -91,11 +102,22 @@ export const chat = async (req, res) => {
         // Save the assistant message after the stream is complete
         result.text.then(async (finalText) => {
             try {
-                // Parts are already accumulated in the correct order during streaming
-                assistantMessage.parts = accumulatedParts;
-                chat.messages.push(assistantMessage);
-                await chat.save();
-                console.log('Assistant message saved to database');
+                // Only add final text if we have no parts yet and the text is not empty
+                if (finalText && finalText.trim() && assistantMessage.parts.length === 0) {
+                    assistantMessage.parts.push({
+                        type: 'text',
+                        text: finalText
+                    });
+                }
+                
+                // Only save if we have parts
+                if (assistantMessage.parts.length > 0) {
+                    chat.messages.push(assistantMessage);
+                    await chat.save();
+                    console.log('Assistant message with parts saved to database');
+                } else {
+                    console.warn('No parts to save for assistant message');
+                }
 
                 // Update chat title after first message exchange if it's still the default
                 if (chat.messages.length === 2 && (chat.title === 'New Chat' || chat.title.length < 10)) {
@@ -103,8 +125,9 @@ export const chat = async (req, res) => {
                         // Create a more descriptive title based on the conversation
                         const userMessage = chat.messages.find(msg => msg.role === 'user');
                         
-                        if (userMessage) {
-                            const userText = userMessage.parts.find(part => part.type === 'text')?.text || '';
+                        if (userMessage && userMessage.parts) {
+                            const textPart = userMessage.parts.find(p => p.type === 'text');
+                            const userText = textPart?.text || '';
                             
                             // Create title from user prompt, limited to 50 characters
                             let newTitle = userText.substring(0, 50);
@@ -128,6 +151,7 @@ export const chat = async (req, res) => {
                 }
             } catch (error) {
                 console.error('Error saving assistant message:', error);
+                console.error('Assistant message parts:', JSON.stringify(assistantMessage.parts, null, 2));
             }
         }).catch(error => {
             console.error('Error getting final text:', error);

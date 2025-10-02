@@ -43,7 +43,7 @@ export const useChatStore = create((set, get) => ({
     const userMsg = {
       id: Date.now() + "",
       role: "user",
-      parts: [{ type: "text", text: prompt }],
+      parts: [{ type: "text", text: prompt }]
     };
 
     const updatedMessages = [...messages, userMsg];
@@ -111,21 +111,53 @@ export const useChatStore = create((set, get) => ({
             try {
               const evt = JSON.parse(payload);
               // Handle different event types from the AI SDK
-              if (evt?.type === "text-delta" && typeof evt.delta === "string") {
+              
+              // Text streaming
+              if (evt?.type === "text-delta" && evt.delta) {
                 get().upsertAssistantText(assistantId, evt.delta);
-              } else if (evt?.type === "tool-input-available" && evt.toolName && evt.input) {
-                // Handle complete tool input
-                const toolPart = {
-                  type: "tool-call",
+              } 
+              // Tool input available (complete tool call)
+              else if (evt?.type === "tool-input-available" && evt.toolCallId && evt.toolName) {
+                get().upsertAssistantToolCall(assistantId, {
+                  toolCallId: evt.toolCallId,
                   toolName: evt.toolName,
-                  input: evt.input
-                };
-                get().upsertAssistantToolPart(assistantId, toolPart);
-              } else if (typeof evt === "string") {
+                  args: evt.input || {}
+                });
+              }
+              // Tool input start (tool call initiated)
+              else if (evt?.type === "tool-input-start" && evt.toolCallId && evt.toolName) {
+                get().upsertAssistantToolCall(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  toolName: evt.toolName,
+                  args: {}
+                });
+              }
+              // Tool output available (result ready)
+              else if (evt?.type === "tool-output-available" && evt.toolCallId) {
+                get().upsertAssistantToolResult(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  result: evt.output
+                });
+              }
+              // Legacy formats
+              else if (evt?.type === "text-delta" && typeof evt.textDelta === "string") {
+                get().upsertAssistantText(assistantId, evt.textDelta);
+              } 
+              else if (evt?.type === "tool-call" && evt.toolCallId && evt.toolName) {
+                get().upsertAssistantToolCall(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  toolName: evt.toolName,
+                  args: evt.args || {}
+                });
+              } 
+              else if (evt?.type === "tool-result" && evt.toolCallId) {
+                get().upsertAssistantToolResult(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  result: evt.result
+                });
+              } 
+              else if (typeof evt === "string") {
                 get().upsertAssistantText(assistantId, evt);
-              } else if (evt?.delta && typeof evt.delta === "string") {
-                // Some providers use { delta: '...' }
-                get().upsertAssistantText(assistantId, evt.delta);
               }
             } catch {
               // Not JSON, treat as raw text
@@ -145,20 +177,53 @@ export const useChatStore = create((set, get) => ({
           if (payload && payload !== "[DONE]") {
             try {
               const evt = JSON.parse(payload);
-              if (evt?.type === "text-delta" && typeof evt.delta === "string") {
+              
+              // Text streaming
+              if (evt?.type === "text-delta" && evt.delta) {
                 get().upsertAssistantText(assistantId, evt.delta);
-              } else if (evt?.type === "tool-input-available" && evt.toolName && evt.input) {
-                // Handle complete tool input
-                const toolPart = {
-                  type: "tool-call",
+              } 
+              // Tool input available (complete tool call)
+              else if (evt?.type === "tool-input-available" && evt.toolCallId && evt.toolName) {
+                get().upsertAssistantToolCall(assistantId, {
+                  toolCallId: evt.toolCallId,
                   toolName: evt.toolName,
-                  input: evt.input
-                };
-                get().upsertAssistantToolPart(assistantId, toolPart);
-              } else if (typeof evt === "string") {
+                  args: evt.input || {}
+                });
+              }
+              // Tool input start (tool call initiated)
+              else if (evt?.type === "tool-input-start" && evt.toolCallId && evt.toolName) {
+                get().upsertAssistantToolCall(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  toolName: evt.toolName,
+                  args: {}
+                });
+              }
+              // Tool output available (result ready)
+              else if (evt?.type === "tool-output-available" && evt.toolCallId) {
+                get().upsertAssistantToolResult(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  result: evt.output
+                });
+              }
+              // Legacy formats
+              else if (evt?.type === "text-delta" && typeof evt.textDelta === "string") {
+                get().upsertAssistantText(assistantId, evt.textDelta);
+              } 
+              else if (evt?.type === "tool-call" && evt.toolCallId && evt.toolName) {
+                get().upsertAssistantToolCall(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  toolName: evt.toolName,
+                  args: evt.args || {}
+                });
+              } 
+              else if (evt?.type === "tool-result" && evt.toolCallId) {
+                get().upsertAssistantToolResult(assistantId, {
+                  toolCallId: evt.toolCallId,
+                  result: evt.result
+                });
+              } 
+              else if (typeof evt === "string") {
                 get().upsertAssistantText(assistantId, evt);
-              } else if (evt?.delta && typeof evt.delta === "string") {
-                get().upsertAssistantText(assistantId, evt.delta);
               }
             } catch {
               get().upsertAssistantText(assistantId, payload);
@@ -204,26 +269,20 @@ export const useChatStore = create((set, get) => ({
     const updatedMessages = messages.map((m) => {
       if (m.id === assistantId) {
         messageExists = true;
-        const existingParts = m.parts || [];
-        const lastPart = existingParts[existingParts.length - 1];
+        const parts = m.parts || [];
+        const lastPart = parts[parts.length - 1];
 
-        // If the last part is text, append to it
+        // If last part is text, append to it
         if (lastPart && lastPart.type === 'text') {
-          const updatedParts = [...existingParts];
+          const updatedParts = [...parts];
           updatedParts[updatedParts.length - 1] = {
             ...lastPart,
             text: lastPart.text + textDelta
           };
-          return {
-            ...m,
-            parts: updatedParts
-          };
+          return { ...m, parts: updatedParts };
         } else {
-          // If the last part is not text (or no parts exist), add a new text part
-          return {
-            ...m,
-            parts: [...existingParts, { type: "text", text: textDelta }]
-          };
+          // Add new text part
+          return { ...m, parts: [...parts, { type: 'text', text: textDelta }] };
         }
       }
       return m;
@@ -250,9 +309,9 @@ export const useChatStore = create((set, get) => ({
     setChatHistory(updatedChatHistory);
   },
 
-  // Append tool part to the assistant message with the given id
-  upsertAssistantToolPart: (assistantId, toolPart) => {
-    if (!toolPart) return;
+  // Handle tool call updates
+  upsertAssistantToolCall: (assistantId, toolCallData) => {
+    if (!toolCallData) return;
 
     const { messages, setMessages, chatHistory, setChatHistory, currentChatId } = get();
 
@@ -260,11 +319,35 @@ export const useChatStore = create((set, get) => ({
     const updatedMessages = messages.map((m) => {
       if (m.id === assistantId) {
         messageExists = true;
-        const existingParts = m.parts || [];
-        return {
-          ...m,
-          parts: [...existingParts, toolPart],
-        };
+        const parts = m.parts || [];
+        
+        // Check if this tool call already exists
+        const existingPartIndex = parts.findIndex(
+          p => p.type === 'tool-call' && p.toolCallId === toolCallData.toolCallId
+        );
+        
+        if (existingPartIndex >= 0) {
+          // Update existing tool call
+          const updatedParts = [...parts];
+          updatedParts[existingPartIndex] = {
+            ...updatedParts[existingPartIndex],
+            toolName: toolCallData.toolName || updatedParts[existingPartIndex].toolName,
+            args: toolCallData.args || updatedParts[existingPartIndex].args
+          };
+          return { ...m, parts: updatedParts };
+        } else {
+          // Add new tool call part
+          return {
+            ...m,
+            parts: [...parts, {
+              type: 'tool-call',
+              toolCallId: toolCallData.toolCallId,
+              toolName: toolCallData.toolName,
+              args: toolCallData.args || {},
+              result: null
+            }]
+          };
+        }
       }
       return m;
     });
@@ -274,10 +357,51 @@ export const useChatStore = create((set, get) => ({
       const newMessage = {
         id: assistantId,
         role: "assistant",
-        parts: [toolPart]
+        parts: [{
+          type: 'tool-call',
+          toolCallId: toolCallData.toolCallId,
+          toolName: toolCallData.toolName,
+          args: toolCallData.args || {},
+          result: null
+        }]
       };
       updatedMessages.push(newMessage);
     }
+
+    setMessages(updatedMessages);
+
+    // Update the current chat in chatHistory
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === currentChatId
+        ? { ...chat, messages: updatedMessages }
+        : chat
+    );
+    setChatHistory(updatedChatHistory);
+  },
+
+  // Handle tool result updates
+  upsertAssistantToolResult: (assistantId, toolResultData) => {
+    if (!toolResultData) return;
+
+    const { messages, setMessages, chatHistory, setChatHistory, currentChatId } = get();
+
+    const updatedMessages = messages.map((m) => {
+      if (m.id === assistantId) {
+        const parts = m.parts || [];
+        const updatedParts = parts.map(part => {
+          if (part.type === 'tool-call' && part.toolCallId === toolResultData.toolCallId) {
+            return {
+              ...part,
+              result: toolResultData.result
+            };
+          }
+          return part;
+        });
+        
+        return { ...m, parts: updatedParts };
+      }
+      return m;
+    });
 
     setMessages(updatedMessages);
 

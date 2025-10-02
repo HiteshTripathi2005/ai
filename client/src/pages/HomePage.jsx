@@ -1,7 +1,7 @@
 import Header from '../components/Header'
-import History from '../components/History'
 import ChatArea from '../components/ChatArea'
 import Composer from '../components/Composer'
+import SidebarLayout from '../components/SidebarLayout'
 import { useChatStore } from '../stores/chatStore'
 import { useAuthStore } from '../stores/authStore'
 import toast from 'react-hot-toast'
@@ -82,46 +82,41 @@ const HomePage = () => {
   }, [location.pathname, currentChatId, selectChat]);
 
   return (
-    <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
-      {/* History Component - Responsive positioning */}
-      <History
-        width={sidebarW}
-        setWidth={setSidebarW}
-        open={sidebarOpen}
-        setOpen={setSidebarOpen}
-        onNewChat={isAuthenticated ? () => handleNewChat(navigate) : () => toast.error('Please login to create new chats')}
-        onDeleteChat={handleDeleteChat}
-        onSelectChat={handleSelectChat}
-        currentChatId={currentChatId}
-        chatHistory={chatHistory}
-        isAuthenticated={isAuthenticated}
-      />
-
-      <main className="flex flex-col w-full relative h-full lg:flex-1 transition-all duration-300">
-        {/* Fixed Header */}
-        <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950">
-          <Header width={sidebarW} setWidth={setSidebarW} setOpen={setSidebarOpen} />
-        </div>
-        {/* Scrollable ChatArea */}
-        <div className="flex-1 flex-col-reverse overflow-y-auto">
-          <ChatArea 
-            messages={messages} 
-            status={status} 
-            isAuthenticated={isAuthenticated} 
-            isLoadingMessages={isLoadingMessages}
-          />
-        </div>
-        {/* Fixed Composer */}
-        <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950">
-          <Composer 
-            onSend={isAuthenticated ? sendMessage : () => toast.error('Please login to send messages')} 
-            isStreaming={isStreaming} 
-            width={sidebarW} 
-            disabled={!isAuthenticated}
-          />
-        </div>
-      </main>
-    </div>
+    <SidebarLayout
+      sidebarWidth={sidebarW}
+      setSidebarWidth={setSidebarW}
+      sidebarOpen={sidebarOpen}
+      setSidebarOpen={setSidebarOpen}
+      onNewChat={isAuthenticated ? () => handleNewChat(navigate) : () => toast.error('Please login to create new chats')}
+      onDeleteChat={handleDeleteChat}
+      onSelectChat={handleSelectChat}
+      currentChatId={currentChatId}
+      chatHistory={chatHistory}
+      isAuthenticated={isAuthenticated}
+    >
+      {/* Fixed Header */}
+      <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950">
+        <Header width={sidebarW} setWidth={setSidebarW} setOpen={setSidebarOpen} />
+      </div>
+      {/* Scrollable ChatArea */}
+      <div className="flex-1 flex-col-reverse overflow-y-auto">
+        <ChatArea 
+          messages={messages} 
+          status={status} 
+          isAuthenticated={isAuthenticated} 
+          isLoadingMessages={isLoadingMessages}
+        />
+      </div>
+      {/* Fixed Composer */}
+      <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950">
+        <Composer 
+          onSend={isAuthenticated ? sendMessage : () => toast.error('Please login to send messages')} 
+          isStreaming={isStreaming} 
+          width={sidebarW} 
+          disabled={!isAuthenticated}
+        />
+      </div>
+    </SidebarLayout>
   )
 }
 

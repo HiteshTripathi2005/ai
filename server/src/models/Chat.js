@@ -13,28 +13,27 @@ const messageSchema = new mongoose.Schema({
   parts: [{
     type: {
       type: String,
-      enum: ['text', 'tool-call', 'tool-result'],
+      enum: ['text', 'tool-call'],
       required: true
     },
     text: {
       type: String,
       required: function() { return this.type === 'text'; }
     },
+    toolCallId: {
+      type: String,
+      required: function() { return this.type === 'tool-call'; }
+    },
     toolName: {
       type: String,
       required: function() { return this.type === 'tool-call'; }
     },
-    input: {
+    args: {
       type: mongoose.Schema.Types.Mixed,
       required: function() { return this.type === 'tool-call'; }
     },
-    toolCallId: {
-      type: String,
-      required: function() { return this.type === 'tool-result'; }
-    },
     result: {
-      type: mongoose.Schema.Types.Mixed,
-      required: function() { return this.type === 'tool-result'; }
+      type: mongoose.Schema.Types.Mixed
     }
   }],
   createdAt: {
