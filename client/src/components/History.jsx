@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Menu, User, Plus, Settings, MessageCircle, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Menu, User, Plus, Settings, MessageCircle, Trash2, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
+import { useAuthStore } from '../stores/authStore';
 
 function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, currentChatId, chatHistory, isAuthenticated }) {
   const [collapsed, setCollapsed] = useState(false);
   const [width, setWidth] = useState(280);
   const [isMobile, setIsMobile] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const isResizing = useRef(false);
+  const profileDropdownRef = useRef(null);
   const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
 
   useEffect(() => {
     const handleResize = () => {
@@ -18,6 +22,18 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setIsProfileDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -55,6 +71,20 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
     if (isMobile) {
       setOpen(false);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    setIsProfileDropdownOpen(false);
+  };
+
+  const handleProfileClick = () => {
+    setIsProfileDropdownOpen(!isProfileDropdownOpen);
+    setCollapsed(false);
+  };
+
+  const getInitials = (name) => {
+    return name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
   };
 
   console.log(collapsed)
@@ -158,11 +188,57 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
               </div>
 
               {/* Profile at Bottom - Fixed at bottom */}
-              <div className="flex-shrink-0 p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700">
-                  <User size={18} />
+              <div className="flex-shrink-0 p-4 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="relative" ref={profileDropdownRef}>
+                  <button
+                    onClick={handleProfileClick}
+                    className={clsx(
+                      'w-full flex items-center gap-2 p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors',
+                      collapsed ? 'justify-center' : 'justify-start'
+                    )}
+                  >
+                    {user?.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name || 'User'}
+                        className="h-6 w-6 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-medium text-zinc-600 dark:text-zinc-300 flex-shrink-0">
+                        {getInitials(user?.name)}
+                      </div>
+                    )}
+                    {!collapsed && (
+                      <div className="flex-1 text-left">
+                        <p className="text-sm font-medium truncate">{user?.name || 'Profile'}</p>
+                      </div>
+                    )}
+                  </button>
+
+                  {isProfileDropdownOpen && (
+                    <div className="absolute bottom-full left-0 mb-2 w-full bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-lg z-50">
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            navigate('/profile');
+                            setIsProfileDropdownOpen(false);
+                          }}
+                          className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                        >
+                          <User className="h-4 w-4 mr-3" />
+                          Go to Profile Page
+                        </button>
+                        <button
+                          onClick={handleLogout}
+                          className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                        >
+                          <LogOut className="h-4 w-4 mr-3" />
+                          Logout
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {!collapsed && <p className="text-sm font-medium">Profile</p>}
               </div>
 
               {/* Resizer */}
@@ -253,11 +329,56 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
             </div>
           </div>
           {/* Profile at Bottom in Mobile */}
-          <div className="mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700">
-              <User size={18} />
+          <div className="mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="relative" ref={profileDropdownRef}>
+              <button
+                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                className="w-full flex items-center gap-2 p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={user.name || 'User'}
+                    className="h-6 w-6 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-medium text-zinc-600 dark:text-zinc-300 flex-shrink-0">
+                    {getInitials(user?.name)}
+                  </div>
+                )}
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium truncate">{user?.name || 'Profile'}</p>
+                </div>
+              </button>
+
+              {isProfileDropdownOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-lg z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        navigate('/profile');
+                        setIsProfileDropdownOpen(false);
+                        setOpen(false); // Close mobile sidebar
+                      }}
+                      className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    >
+                      <User className="h-4 w-4 mr-3" />
+                      Go to Profile Page
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setOpen(false); // Close mobile sidebar
+                      }}
+                      className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    >
+                      <LogOut className="h-4 w-4 mr-3" />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-sm font-medium">Profile</p>
           </div>
         </motion.div>
       )}

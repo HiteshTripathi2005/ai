@@ -6,6 +6,8 @@ import RegisterPage from './pages/RegisterPage';
 import { useAuthStore } from './stores/authStore';
 import { Toaster } from 'react-hot-toast';
 import Loading from './components/Loading';
+import ProfilePage from './pages/ProfilePage';
+import LandingPage from './pages/LandingPage';
 
 
 export default function App() {
@@ -24,8 +26,10 @@ export default function App() {
     <Router>
       <Toaster />
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/chat/:chatId" element={<HomePage />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/" element={ isAuthenticated ? <HomePage /> : <LandingPage />} />
+        <Route path="/chat/:chatId" element={isAuthenticated ? <HomePage /> : <Navigate to="/" />} />
+        <Route path="/profile" element={isAuthenticated ? <ProfilePage /> : <Navigate to="/" />} />
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
         <Route path="/register" element={isAuthenticated ? <Navigate to="/" /> : <RegisterPage />} />
       </Routes>

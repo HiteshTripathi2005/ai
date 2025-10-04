@@ -17,7 +17,6 @@ const HomePage = () => {
     sidebarW,
     chatHistory,
     currentChatId,
-    isStreaming,
     isLoadingMessages,
     sendMessage,
     handleNewChat,
@@ -28,6 +27,16 @@ const HomePage = () => {
     setSidebarW,
     toggleSidebar
   } = useChatStore();
+
+  // Compute isStreaming for current chat
+  const isStreaming = useChatStore(state => 
+    state.status === "streaming" && state.currentChatId === state.streamingChatId
+  );
+
+  // Compute status for current chat
+  const computedStatus = useChatStore(state => 
+    state.currentChatId === state.streamingChatId ? state.status : "ready"
+  );
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -98,7 +107,7 @@ const HomePage = () => {
       <div className="flex-1 flex-col-reverse overflow-y-auto">
         <ChatArea 
           messages={messages} 
-          status={status} 
+          status={computedStatus} 
           isAuthenticated={isAuthenticated} 
           isLoadingMessages={isLoadingMessages}
         />
@@ -106,7 +115,16 @@ const HomePage = () => {
       {/* Fixed Composer */}
       <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950">
         <Composer 
-          onSend={isAuthenticated ? sendMessage : () => toast.error('Please login to send messages')} 
+          onSend={isAuthenticated ? async (prompt) => {
+            if (location.pathname === '/' || currentChatId === "default-chat") {
+              const result = await handleNewChat(navigate);
+              if (result && result.success) {
+                sendMessage(prompt);
+              }
+            } else {
+              sendMessage(prompt);
+            }
+          } : () => toast.error('Please login to send messages')} 
           isStreaming={isStreaming} 
           width={sidebarW} 
           disabled={!isAuthenticated}

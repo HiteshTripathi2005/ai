@@ -105,6 +105,34 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  // Update profile function
+  updateProfile: async (name, email) => {
+    const { setLoading, setError, setUser } = get();
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await api.put('/auth/profile', {
+        name,
+        email,
+      });
+
+      const { user } = response.data.data;
+
+      setUser(user);
+      setLoading(false);
+      toast.success('Profile updated successfully!');
+      return { success: true };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to update profile';
+      setError(message);
+      setLoading(false);
+      toast.error(message);
+      return { success: false, message };
+    }
+  },
+
   getMe: async () => {
     const { setUser, setAuthenticated, setError, setLoading, setAuthChecked } = get();
 
@@ -115,7 +143,8 @@ export const useAuthStore = create((set, get) => ({
 
       setUser(user);
       setAuthenticated(true);
-      
+      console.log('User authenticated:', user);
+
       return { success: true };
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to fetch user';

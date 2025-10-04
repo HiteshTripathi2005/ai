@@ -21,7 +21,6 @@ const MessagePage = () => {
   const {
     messages,
     status,
-    isStreaming,
     isLoadingMessages,
     sendMessage,
     selectChat,
@@ -33,6 +32,16 @@ const MessagePage = () => {
     handleNewChat,
     deleteChat
   } = useChatStore();
+
+  // Compute isStreaming for current chat
+  const isStreaming = useChatStore(state => 
+    state.status === "streaming" && state.currentChatId === state.streamingChatId
+  );
+
+  // Compute status for current chat
+  const computedStatus = useChatStore(state => 
+    state.currentChatId === state.streamingChatId ? state.status : "ready"
+  );
 
   useEffect(() => {
     if (isAuthenticated && chatId) {
@@ -158,7 +167,7 @@ const MessagePage = () => {
         <div className="flex-1 overflow-y-auto">
           <ChatArea
             messages={messages}
-            status={status}
+            status={computedStatus}
             isAuthenticated={isAuthenticated}
             isLoadingMessages={isLoadingMessages}
           />
