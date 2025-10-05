@@ -25,6 +25,7 @@ A Node.js/Express backend for an AI chat application with MongoDB, JWT authentic
 ## Installation
 
 1. **Install dependencies:**
+
    ```bash
    cd server
    bun install
@@ -32,6 +33,7 @@ A Node.js/Express backend for an AI chat application with MongoDB, JWT authentic
 
 2. **Environment Setup:**
    Create/update `.env` file:
+
    ```env
    MONGODB_URI=mongodb://localhost:27017/ai-chat
    JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
@@ -46,6 +48,7 @@ A Node.js/Express backend for an AI chat application with MongoDB, JWT authentic
    Make sure MongoDB is running on your system.
 
 4. **Run the server:**
+
    ```bash
    # Development mode
    bun run dev
@@ -59,6 +62,7 @@ A Node.js/Express backend for an AI chat application with MongoDB, JWT authentic
 ### Authentication Routes
 
 #### Register User
+
 ```http
 POST /api/auth/register
 Content-Type: application/json
@@ -71,6 +75,7 @@ Content-Type: application/json
 ```
 
 #### Login User
+
 ```http
 POST /api/auth/login
 Content-Type: application/json
@@ -82,6 +87,7 @@ Content-Type: application/json
 ```
 
 #### Get Current User
+
 ```http
 GET /api/auth/me
 Authorization: Bearer <token>
@@ -89,6 +95,7 @@ Authorization: Bearer <token>
 ```
 
 #### Update Profile
+
 ```http
 PUT /api/auth/profile
 Authorization: Bearer <token>
@@ -101,6 +108,7 @@ Content-Type: application/json
 ```
 
 #### Logout
+
 ```http
 POST /api/auth/logout
 # Clears the authentication cookie
@@ -109,6 +117,7 @@ POST /api/auth/logout
 ### Chat Routes
 
 #### Send Chat Message
+
 ```http
 POST /api/chat
 Authorization: Bearer <token>
@@ -124,6 +133,7 @@ Content-Type: application/json
 All API responses follow this format:
 
 **Success Response:**
+
 ```json
 {
   "success": true,
@@ -135,6 +145,7 @@ All API responses follow this format:
 ```
 
 **Error Response:**
+
 ```json
 {
   "success": false,
@@ -147,6 +158,7 @@ All API responses follow this format:
 The API uses JWT tokens stored in HTTP-only cookies for authentication. Include the token in the Authorization header or rely on the cookie for automatic authentication.
 
 ### Cookie Configuration
+
 - **httpOnly**: `true` (prevents XSS attacks)
 - **secure**: `true` in production (HTTPS only)
 - **sameSite**: `strict` (CSRF protection)
@@ -155,6 +167,7 @@ The API uses JWT tokens stored in HTTP-only cookies for authentication. Include 
 ## Database Schema
 
 ### User Model
+
 ```javascript
 {
   name: String (required, max 50 chars),
@@ -170,6 +183,7 @@ The API uses JWT tokens stored in HTTP-only cookies for authentication. Include 
 ## Error Handling
 
 The API includes comprehensive error handling for:
+
 - Validation errors
 - Authentication failures
 - Database connection issues
@@ -188,12 +202,14 @@ The API includes comprehensive error handling for:
 ## Development
 
 ### Testing Database Connection
+
 ```bash
 cd server
 bun run node src/test-db.js
 ```
 
 ### Available Scripts
+
 - `bun run dev` - Start development server with nodemon
 - `bun run start` - Start production server
 - `bun run node src/test-db.js` - Test database connection

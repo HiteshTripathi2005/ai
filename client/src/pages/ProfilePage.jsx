@@ -48,7 +48,6 @@ const ProfilePage = () => {
       const result = await updateProfile(formData.name, formData.email);
       if (result.success) {
         setIsEditing(false);
-        toast.success('Profile updated successfully');
       } else {
         toast.error(result.message || 'Failed to update profile');
       }

@@ -87,7 +87,6 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
     return name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
   };
 
-  console.log(collapsed)
 
   return (
     <>
@@ -141,15 +140,15 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
                       chatHistory.map((chat) => (
                         <div
                           key={chat._id || chat.id}
+                          onClick={() => handleChatSelect(chat._id || chat.id)}
                           className={clsx(
-                            'group relative w-full rounded-xl border transition-all duration-200 p-3',
+                            'group relative w-full rounded-xl border transition-all duration-200 p-3 cursor-pointer',
                             (currentChatId === chat._id || currentChatId === chat.id)
                               ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600'
                               : 'border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
                           )}
                         >
-                          <button
-                            onClick={() => handleChatSelect(chat._id || chat.id)}
+                          <div
                             className="w-full text-left flex items-center gap-3"
                           >
                             <MessageCircle size={16} className="text-zinc-400 flex-shrink-0" />
@@ -161,7 +160,7 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
                                 {new Date(chat.createdAt || Date.now()).toLocaleDateString()}
                               </p>
                             </div>
-                          </button>
+                          </div>
                           {chatHistory.length > 1 && (
                             <button
                               onClick={(e) => {

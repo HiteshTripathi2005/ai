@@ -242,7 +242,8 @@ export const useChatStore = create((set, get) => ({
       toast.error(`Failed to send message: ${errorMessage}`);
     } finally {
       setStatus("ready");
-      const streamingChat = streamingChatId; // Save before clearing
+      const { streamingChatId: currentStreamingChatId } = get();
+      const streamingChat = currentStreamingChatId; // Save before clearing
       setStreamingChatId(null); // Clear streaming chat
 
       // Update the chatHistory with the latest messages and title
@@ -257,8 +258,8 @@ export const useChatStore = create((set, get) => ({
         if ((chat._id || chat.id) === chatIdToUpdate) {
           let updatedChat = { ...chat, messages: finalMessages };
           
-          // Update title if this is the first message and title is still "New Chat"
-          if (chat.title === 'New Chat' && finalMessages.length >= 1) {
+          // Update title if this is the first message exchange and title is still "New Chat" or too short
+          if ((chat.title === 'New Chat' || chat.title.length < 10) && finalMessages.length >= 2) {
             const userMessage = finalMessages.find(msg => msg.role === 'user');
             if (userMessage && userMessage.parts) {
               const textPart = userMessage.parts.find(p => p.type === 'text');

@@ -1,5 +1,5 @@
 import { google } from '@ai-sdk/google';
-import { stepCountIs, streamText } from 'ai';
+import { smoothStream, stepCountIs, streamText } from 'ai';
 import { getMergedTools } from '../utils/tools.js';
 import { systemPrompt } from '../utils/systemPrompt.js';
 import Chat from '../models/Chat.js';
@@ -94,7 +94,11 @@ export const chat = async (req, res) => {
                         }
                     }
                 }
-            }
+            },
+            experimental_transform: smoothStream({
+                delayInMs: 43,
+                chunking: "word"
+            })
         });
 
         // Get the original response
