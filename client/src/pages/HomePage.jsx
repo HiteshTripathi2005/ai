@@ -115,14 +115,14 @@ const HomePage = () => {
       {/* Fixed Composer */}
       <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950">
         <Composer 
-          onSend={isAuthenticated ? async (prompt) => {
+          onSend={isAuthenticated ? async ({ message, model }) => {
             if (location.pathname === '/' || currentChatId === "default-chat") {
               const result = await handleNewChat(navigate);
               if (result && result.success) {
-                sendMessage(prompt);
+                sendMessage(message, undefined, model);
               }
             } else {
-              sendMessage(prompt);
+              sendMessage(message, undefined, model);
             }
           } : () => toast.error('Please login to send messages')} 
           isStreaming={isStreaming} 

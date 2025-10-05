@@ -37,7 +37,7 @@ export const useChatStore = create((set, get) => ({
   setStreamingChatId: (streamingChatId) => set({ streamingChatId }),
 
   // Chat functions
-  sendMessage: async (prompt) => {
+  sendMessage: async (prompt, chatId, model = "gemini-2.0-flash-exp") => {
     if (!prompt.trim()) return;
 
     const { messages, setMessages, setStatus, setError, chatHistory, setChatHistory, currentChatId, fetchChats, setCurrentChatId, setStreamingChatId } = get();
@@ -76,7 +76,8 @@ export const useChatStore = create((set, get) => ({
         credentials: 'include', // For cookies
         body: JSON.stringify({
           prompt,
-          chatId: currentChatId === "default-chat" ? null : currentChatId
+          chatId: currentChatId === "default-chat" ? null : currentChatId,
+          model
         })
       });
 

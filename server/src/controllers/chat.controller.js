@@ -1,12 +1,18 @@
-import { google } from '@ai-sdk/google';
+import {createOpenRouter} from "@openrouter/ai-sdk-provider"
 import { smoothStream, stepCountIs, streamText } from 'ai';
 import { getMergedTools } from '../utils/tools.js';
 import { systemPrompt } from '../utils/systemPrompt.js';
 import Chat from '../models/Chat.js';
 
+
+const openrouter = createOpenRouter({
+  apiKey: process.env.OPENROUTER_API_KEY,
+});
+
+
 export const chat = async (req, res) => {
     try {
-        const { prompt, chatId } = req.body;
+        const { prompt, chatId, model } = req.body;
         const userId = req.user._id;
 
         console.log("Received prompt:", prompt);
@@ -52,8 +58,33 @@ export const chat = async (req, res) => {
         // Load merged tools (local + MCP)
         const { tools: mergedTools, close: closeMcp } = await getMergedTools();
 
+        // Select model based on request
+        let selectedModel;
+        switch (model) {
+            case "gemini-2.0-flash-exp":
+                selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
+                break;
+            case "z-ai/glm-4.5-air:free":
+                selectedModel = openrouter.chat('z-ai/glm-4.5-air:free');
+                break;
+            case "qwen/qwen3-coder:free":
+                selectedModel = openrouter.chat('qwen/qwen3-coder:free');
+                break;
+            case "mistralai/mistral-small-3.2-24b-instruct:free":
+                selectedModel = openrouter.chat('mistralai/mistral-small-3.2-24b-instruct:free');
+                break;
+            case "openai/gpt-oss-20b:free":
+                selectedModel = openrouter.chat('openai/gpt-oss-20b:free');
+                break;
+            default:
+                selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
+                break;
+        }
+
+        console.log("available tools:", Object.keys(mergedTools));
+
         const result = await streamText({
-            model: google('gemini-2.5-flash'),
+            model: selectedModel,
             system: systemPrompt,
             prompt,
             stopWhen: stepCountIs(10),
