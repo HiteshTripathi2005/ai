@@ -367,3 +367,306 @@ export const updateChatTitle = async (req, res) => {
         });
     }
 }
+
+// Helper function to get model instance
+const getModelInstance = (modelName) => {
+    switch (modelName) {
+        case "gemini-2.0-flash-exp":
+            return openrouter.chat('google/gemini-2.0-flash-001');
+        case "z-ai/glm-4.5-air:free":
+            return openrouter.chat('z-ai/glm-4.5-air:free');
+        case "qwen/qwen3-coder:free":
+            return openrouter.chat('qwen/qwen3-coder:free');
+        case "mistralai/mistral-small-3.2-24b-instruct:free":
+            return openrouter.chat('mistralai/mistral-small-3.2-24b-instruct:free');
+        case "openai/gpt-oss-20b:free":
+            return openrouter.chat('openai/gpt-oss-20b:free');
+        default:
+            return openrouter.chat('google/gemini-2.0-flash-001');
+    }
+};
+
+// Multi-model chat - get responses from multiple models
+export const multiModelChat = async (req, res) => {
+    try {
+        const { prompt, chatId, models } = req.body;
+        const userId = req.user._id;
+
+        console.log("Received multi-model prompt:", prompt, "Models:", models);
+
+        if (!prompt) {
+            return res.status(400).json({ error: "Prompt is required" });
+        }
+
+        if (!models || !Array.isArray(models) || models.length === 0) {
+            return res.status(400).json({ error: "At least one model is required" });
+        }
+
+        // Find or create chat
+        let chat = null;
+        if (chatId) {
+            chat = await Chat.findOne({ _id: chatId, user: userId });
+        }
+
+        if (!chat) {
+            const chatTitle = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
+            console.log('Creating new chat with title:', chatTitle);
+            chat = new Chat({
+                user: userId,
+                title: chatTitle,
+                messages: []
+            });
+            await chat.save();
+            console.log('New chat created with ID:', chat._id, 'and title:', chat.title);
+        }
+
+        // Add user message to chat
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            parts: [{ type: 'text', text: prompt }]
+        };
+        chat.messages.push(userMessage);
+        await chat.save();
+
+        // Prepare assistant message structure for multi-model
+        const assistantMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            isMultiModel: true,
+            multiModelResponses: []
+        };
+
+        // Load merged tools (local + MCP)
+        const { tools: mergedTools, close: closeMcp } = await getMergedTools();
+
+        console.log("available tools:", Object.keys(mergedTools));
+
+        // Set up SSE headers
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        // Store model responses
+        const modelResponses = {};
+
+        // Process each model in parallel
+        const modelPromises = models.map(async (modelName) => {
+            const modelInstance = getModelInstance(modelName);
+            const modelResponse = {
+                model: modelName,
+                parts: [],
+                show: false,
+                selected: false
+            };
+
+            try {
+                const result = await streamText({
+                    model: modelInstance,
+                    system: systemPrompt,
+                    prompt,
+                    stopWhen: stepCountIs(10),
+                    tools: mergedTools,
+                    onStepFinish: async (step) => {
+                        console.log(`[${modelName}] Step finished:`, 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
+
+                        // Add text part first (matches single-model order)
+                        if (step.text && step.text.trim()) {
+                            modelResponse.parts.push({
+                                type: 'text',
+                                text: step.text
+                            });
+                        }
+
+                        // Add tool calls if present (after text, matches single-model order)
+                        if (step.toolCalls && step.toolCalls.length > 0) {
+                            for (const toolCall of step.toolCalls) {
+                                console.log(`[${modelName}] Tool call:`, toolCall.toolName);
+                                // Stream tool call start event
+                                res.write(`data: ${JSON.stringify({
+                                    type: 'tool-input-available',
+                                    model: modelName,
+                                    toolCallId: toolCall.toolCallId,
+                                    toolName: toolCall.toolName,
+                                    input: toolCall.args || toolCall.input || toolCall.arguments || {}
+                                })}\n\n`);
+
+                                // Add to model response
+                                modelResponse.parts.push({
+                                    type: 'tool-call',
+                                    toolCallId: toolCall.toolCallId,
+                                    toolName: toolCall.toolName,
+                                    args: toolCall.args || toolCall.input || toolCall.arguments || {}
+                                });
+                            }
+                        }
+
+                        // Update tool results if present (matches single-model - updates existing tool calls)
+                        if (step.toolResults && step.toolResults.length > 0) {
+                            for (const toolResult of step.toolResults) {
+                                console.log(`[${modelName}] Tool result:`, toolResult.toolCallId);
+                                // Stream tool result event
+                                res.write(`data: ${JSON.stringify({
+                                    type: 'tool-output-available',
+                                    model: modelName,
+                                    toolCallId: toolResult.toolCallId,
+                                    output: toolResult.result
+                                })}\n\n`);
+
+                                // Update the existing tool call part with result
+                                const toolCallPart = modelResponse.parts.find(
+                                    p => p.type === 'tool-call' && p.toolCallId === toolResult.toolCallId
+                                );
+                                if (toolCallPart) {
+                                    toolCallPart.result = toolResult.result;
+                                }
+                            }
+                        }
+                    },
+                    experimental_transform: smoothStream({
+                        delayInMs: 43,
+                        chunking: "word"
+                    })
+                });
+
+                // Stream the response
+                for await (const chunk of result.textStream) {
+                    // Send streaming update to client
+                    res.write(`data: ${JSON.stringify({
+                        type: 'text-delta',
+                        model: modelName,
+                        delta: chunk
+                    })}\n\n`);
+                }
+
+                // Get final text
+                const finalText = await result.text;
+                if (finalText && finalText.trim() && modelResponse.parts.length === 0) {
+                    modelResponse.parts.push({
+                        type: 'text',
+                        text: finalText
+                    });
+                }
+
+                modelResponses[modelName] = modelResponse;
+                
+                // Send completion event for this model
+                res.write(`data: ${JSON.stringify({
+                    type: 'model-complete',
+                    model: modelName
+                })}\n\n`);
+
+            } catch (error) {
+                console.error(`Error with model ${modelName}:`, error);
+                modelResponse.parts.push({
+                    type: 'text',
+                    text: `Error: Failed to get response from ${modelName}`
+                });
+                modelResponses[modelName] = modelResponse;
+            }
+        });
+
+        // Wait for all models to complete
+        await Promise.all(modelPromises);
+
+        // Add all model responses to assistant message
+        assistantMessage.multiModelResponses = Object.values(modelResponses);
+
+        // Save to database
+        chat.messages.push(assistantMessage);
+        await chat.save();
+
+        // Send final completion with message ID
+        res.write(`data: ${JSON.stringify({
+            type: 'complete',
+            messageId: assistantMessage.id,
+            chatId: chat._id
+        })}\n\n`);
+
+        res.end();
+
+        // Close MCP connections
+        try {
+            await closeMcp();
+            console.log('MCP connections closed successfully');
+        } catch (closeError) {
+            console.warn('Error closing MCP connections:', closeError);
+        }
+
+    } catch (error) {
+        console.error("Error occurred while processing multi-model chat:", error);
+        if (!res.headersSent) {
+            res.status(500).json({ error: "Internal Server Error" });
+        }
+    }
+};
+
+// Select preferred model response
+export const selectModelResponse = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { chatId, messageId, selectedModel } = req.body;
+
+        if (!chatId || !messageId || !selectedModel) {
+            return res.status(400).json({
+                success: false,
+                message: "chatId, messageId, and selectedModel are required"
+            });
+        }
+
+        const chat = await Chat.findOne({ _id: chatId, user: userId, isActive: true });
+
+        if (!chat) {
+            return res.status(404).json({
+                success: false,
+                message: "Chat not found"
+            });
+        }
+
+        // Find the message and update the selected model
+        const message = chat.messages.find(msg => msg.id === messageId);
+
+        if (!message) {
+            return res.status(404).json({
+                success: false,
+                message: "Message not found"
+            });
+        }
+
+        if (!message.isMultiModel || !message.multiModelResponses) {
+            return res.status(400).json({
+                success: false,
+                message: "Message is not a multi-model response"
+            });
+        }
+
+        // Update all responses: mark selected one as show=true and selected=true
+        message.multiModelResponses.forEach(response => {
+            if (response.model === selectedModel) {
+                response.show = true;
+                response.selected = true;
+            } else {
+                response.show = false;
+                response.selected = false;
+            }
+        });
+
+        await chat.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Model response selected successfully",
+            data: {
+                chatId: chat._id,
+                messageId: message.id,
+                selectedModel
+            }
+        });
+    } catch (error) {
+        console.error("Error selecting model response:", error);
+        res.status(500).json({
+            success: false,
+            message: "Failed to select model response"
+        });
+    }
+}

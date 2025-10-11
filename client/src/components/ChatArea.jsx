@@ -4,8 +4,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Loading from './Loading';
 import ToolCallRenderer from './ToolCallRenderer';
+import MultiModelResponse from './MultiModelResponse';
 
-function MessageBubble({ msg }) {
+function MessageBubble({ msg, onSelectModel }) {
   const isUser = msg.role === "user";
   const [copied, setCopied] = useState(false);
 
@@ -78,6 +79,11 @@ function MessageBubble({ msg }) {
     return null;
   };
 
+  // Check if this is a multi-model message
+  if (msg.isMultiModel && msg.multiModelResponses) {
+    return <MultiModelResponse msg={msg} onSelectModel={onSelectModel} />;
+  }
+
   const parts = msg.parts || [];
 
   return (
@@ -87,7 +93,7 @@ function MessageBubble({ msg }) {
   );
 }
 
-export default function ChatArea({ messages, status, isAuthenticated, isLoadingMessages }) {
+export default function ChatArea({ messages, status, isAuthenticated, isLoadingMessages, onSelectModel }) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
@@ -170,7 +176,7 @@ export default function ChatArea({ messages, status, isAuthenticated, isLoadingM
             <Loading />
           </div>
         ) : (
-          messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)
+          messages.map((msg) => <MessageBubble key={msg.id} msg={msg} onSelectModel={onSelectModel} />)
         )}
 
         {status === "streaming" && (

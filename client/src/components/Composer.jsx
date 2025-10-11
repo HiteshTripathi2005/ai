@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import cx from "clsx";
-import { Send, Loader2, ChevronDown } from "lucide-react";
+import { Send, Loader2, ChevronDown, Layers } from "lucide-react";
 
-function Composer({ onSend, isStreaming, width, disabled = false }) {
+function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSend }) {
   const [value, setValue] = useState("");
   const [selectedModel, setSelectedModel] = useState("gemini-2.0-flash-exp");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isMultiMode, setIsMultiMode] = useState(false);
+  const [selectedModels, setSelectedModels] = useState(["gemini-2.0-flash-exp"]);
   const textareaRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -15,7 +17,7 @@ function Composer({ onSend, isStreaming, width, disabled = false }) {
   // Available models
   const models = [
     { id: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash", provider: "Google" },
-    { id: "z-ai/glm-4.5-air:free", name: "Gemini 4.5 Air", provider: "z-ai" },
+    { id: "z-ai/glm-4.5-air:free", name: "GLM 4.5 Air", provider: "z-ai" },
     { id: "qwen/qwen3-coder:free", name: "Qwen 3 Coder", provider: "qwen" },
     { id: "mistralai/mistral-small-3.2-24b-instruct:free", name: "Mistral Small 3.2", provider: "mistralai" },
     { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B", provider: "openai" },
@@ -56,7 +58,11 @@ function Composer({ onSend, isStreaming, width, disabled = false }) {
   const handleSend = () => {
     if (!sendDisabled && value.trim()) {
       try {
-        onSend({ message: value.trim(), model: selectedModel });
+        if (isMultiMode && onMultiModelSend) {
+          onMultiModelSend({ message: value.trim(), models: selectedModels });
+        } else {
+          onSend({ message: value.trim(), model: selectedModel });
+        }
         setValue("");
       } catch (error) {
         console.error('Failed to send message:', error);
@@ -77,8 +83,33 @@ function Composer({ onSend, isStreaming, width, disabled = false }) {
   };
 
   const handleModelSelect = (modelId) => {
-    setSelectedModel(modelId);
-    setIsModelDropdownOpen(false);
+    if (isMultiMode) {
+      // Toggle model selection in multi-mode
+      setSelectedModels(prev => {
+        if (prev.includes(modelId)) {
+          // Don't allow deselecting all models
+          if (prev.length === 1) return prev;
+          return prev.filter(id => id !== modelId);
+        } else {
+          return [...prev, modelId];
+        }
+      });
+    } else {
+      setSelectedModel(modelId);
+      setIsModelDropdownOpen(false);
+    }
+  };
+
+  const toggleMultiMode = () => {
+    const newMode = !isMultiMode;
+    setIsMultiMode(newMode);
+    if (newMode) {
+      // When switching to multi-mode, start with current model selected
+      setSelectedModels([selectedModel]);
+    } else {
+      // When switching to single mode, use first selected model
+      setSelectedModel(selectedModels[0] || "gemini-2.0-flash-exp");
+    }
   };
 
   const currentModel = models.find(m => m.id === selectedModel);
@@ -88,6 +119,24 @@ function Composer({ onSend, isStreaming, width, disabled = false }) {
       <div className="mx-auto w-full max-w-3xl">
         {/* Model Selector */}
         <div className="flex items-center gap-2 mb-2">
+          {/* Multi-mode toggle */}
+          <button
+            onClick={toggleMultiMode}
+            disabled={isStreaming}
+            className={cx(
+              "inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors",
+              isStreaming
+                ? "bg-zinc-100 text-zinc-400 cursor-not-allowed border-zinc-200"
+                : isMultiMode
+                ? "bg-blue-500 text-white border-blue-500 hover:bg-blue-600"
+                : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+            )}
+            title={isMultiMode ? "Switch to single model" : "Compare multiple models"}
+          >
+            <Layers className="h-4 w-4" />
+            {isMultiMode ? `${selectedModels.length} Models` : "Multi"}
+          </button>
+
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
@@ -99,10 +148,21 @@ function Composer({ onSend, isStreaming, width, disabled = false }) {
                   : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
               )}
             >
-              <span className="font-medium">{currentModel?.name || "Select Model"}</span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {currentModel?.provider}
-              </span>
+              {isMultiMode ? (
+                <>
+                  <span className="font-medium">Select Models</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    ({selectedModels.length} selected)
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">{currentModel?.name || "Select Model"}</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {currentModel?.provider}
+                  </span>
+                </>
+              )}
               <ChevronDown className={cx(
                 "h-3 w-3 transition-transform",
                 isModelDropdownOpen ? "rotate-180" : ""
@@ -111,23 +171,52 @@ function Composer({ onSend, isStreaming, width, disabled = false }) {
 
             {isModelDropdownOpen && (
               <div className="absolute bottom-full mb-1 left-0 z-50 w-64 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
+                {isMultiMode && (
+                  <div className="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
+                    Select models to compare (min: 1)
+                  </div>
+                )}
                 <div className="py-1 max-h-48 overflow-y-auto">
                   {models.map((model) => (
                     <button
                       key={model.id}
                       onClick={() => handleModelSelect(model.id)}
                       className={cx(
-                        "w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors",
-                        selectedModel === model.id
+                        "w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors flex items-center gap-2",
+                        isMultiMode
+                          ? selectedModels.includes(model.id)
+                            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-900 dark:text-blue-100"
+                            : "text-zinc-700 dark:text-zinc-300"
+                          : selectedModel === model.id
                           ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                           : "text-zinc-700 dark:text-zinc-300"
                       )}
                     >
-                      <div className="font-medium text-sm">{model.name}</div>
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400">{model.provider}</div>
+                      {isMultiMode && (
+                        <input
+                          type="checkbox"
+                          checked={selectedModels.includes(model.id)}
+                          onChange={() => {}}
+                          className="h-4 w-4 rounded border-zinc-300 text-blue-600"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{model.name}</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">{model.provider}</div>
+                      </div>
                     </button>
                   ))}
                 </div>
+                {isMultiMode && (
+                  <div className="px-3 py-2 border-t border-zinc-200 dark:border-zinc-700">
+                    <button
+                      onClick={() => setIsModelDropdownOpen(false)}
+                      className="w-full px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

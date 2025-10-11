@@ -10,6 +10,7 @@ const messageSchema = new mongoose.Schema({
     enum: ['user', 'assistant'],
     required: true
   },
+  // For single model responses (legacy support)
   parts: [{
     type: {
       type: String,
@@ -36,6 +37,37 @@ const messageSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.Mixed
     }
   }],
+  // For multi-model responses
+  multiModelResponses: [{
+    model: {
+      type: String,
+      required: true
+    },
+    parts: [{
+      type: {
+        type: String,
+        enum: ['text', 'tool-call'],
+        required: true
+      },
+      text: String,
+      toolCallId: String,
+      toolName: String,
+      args: mongoose.Schema.Types.Mixed,
+      result: mongoose.Schema.Types.Mixed
+    }],
+    show: {
+      type: Boolean,
+      default: false
+    },
+    selected: {
+      type: Boolean,
+      default: false
+    }
+  }],
+  isMultiModel: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -55,13 +55,47 @@ export const useChatStore = create((set, get) => ({
     setError(null);
 
     // Update the current chat in chatHistory
-    const updatedChatHistory = chatHistory.map(chat => 
-      (chat._id || chat.id) === currentChatId 
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === currentChatId
         ? { ...chat, messages: updatedMessages }
         : chat
     );
     setChatHistory(updatedChatHistory);
 
+    // Update chat title after 3 seconds based on user message
+    
+      const { chatHistory: currentChatHistory, setChatHistory: setCurrentChatHistory } = get();
+      const chatToUpdate = currentChatHistory.find(chat => (chat._id || chat.id) === currentChatId);
+      if (chatToUpdate && (chatToUpdate.title === 'New Chat' || chatToUpdate.title.length < 10)) {
+        const userMessage = userMsg;
+        if (userMessage && userMessage.parts) {
+          const textPart = userMessage.parts.find(p => p.type === 'text');
+          const userText = textPart?.text || '';
+
+          if (userText.trim()) {
+            let newTitle = userText.substring(0, 50);
+            if (userText.length > 50) {
+              newTitle += '...';
+            }
+
+            // If the title would be too short, use more of the prompt
+            if (newTitle.length < 10 && userText.length > 10) {
+              newTitle = userText.substring(0, 100) + (userText.length > 100 ? '...' : '');
+            }
+
+            const updatedChatHistoryWithTitle = currentChatHistory.map(chat => {
+              if ((chat._id || chat.id) === currentChatId) {
+                return { ...chat, title: newTitle };
+              }
+              return chat;
+            });
+            setCurrentChatHistory(updatedChatHistoryWithTitle);
+            // Update title in database
+            get().updateChatTitle(currentChatId, newTitle);
+          }
+        }
+      }
+    
     // Create assistant placeholder to stream into
     const assistantId = `${Date.now()}-ai`;
     let assistantMessage = null;
@@ -279,6 +313,8 @@ export const useChatStore = create((set, get) => ({
               
               if (newTitle.trim()) {
                 updatedChat.title = newTitle;
+                // Update title in database
+                get().updateChatTitle(chatIdToUpdate, newTitle);
               }
             }
           }
@@ -485,7 +521,24 @@ export const useChatStore = create((set, get) => ({
         : chat
     );
     setChatHistory(updatedChatHistory);
-  },  // Chat management functions
+  },  // Update chat title in database
+  updateChatTitle: async (chatId, newTitle) => {
+    try {
+      const response = await api.put(`/chat/chats/${chatId}/title`, { title: newTitle });
+      if (response.data.success) {
+        console.log('Title updated in database:', newTitle);
+        return { success: true };
+      } else {
+        console.error('Failed to update title in database');
+        return { success: false };
+      }
+    } catch (error) {
+      console.error('Error updating title in database:', error);
+      return { success: false };
+    }
+  },
+
+  // Chat management functions
   fetchChats: async () => {
     try {
       const response = await api.get('/chat/chats');
@@ -613,5 +666,322 @@ export const useChatStore = create((set, get) => ({
   toggleSidebar: () => {
     const { sidebarOpen, setSidebarOpen } = get();
     setSidebarOpen(!sidebarOpen);
+  },
+
+  // Multi-model send message
+  sendMultiModelMessage: async (prompt, models) => {
+    if (!prompt.trim() || !models || models.length === 0) return;
+
+    const { messages, setMessages, setStatus, setError, chatHistory, setChatHistory, currentChatId, setStreamingChatId } = get();
+
+    const userMsg = {
+      id: Date.now() + "",
+      role: "user",
+      parts: [{ type: "text", text: prompt }]
+    };
+
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setStatus("streaming");
+    setStreamingChatId(currentChatId);
+    setError(null);
+
+    // Update the current chat in chatHistory
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === currentChatId
+        ? { ...chat, messages: updatedMessages }
+        : chat
+    );
+    setChatHistory(updatedChatHistory);
+
+    // Create assistant placeholder for multi-model
+    const assistantId = `${Date.now()}-ai`;
+    const modelResponses = {};
+
+    // Initialize empty responses for each model
+    models.forEach(model => {
+      modelResponses[model] = {
+        model,
+        parts: [],
+        show: false,
+        selected: false
+      };
+    });
+
+    try {
+      const response = await fetch('http://localhost:5000/api/chat/multi-model', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          prompt,
+          chatId: currentChatId === "default-chat" ? null : currentChatId,
+          models
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Handle streaming response
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      let done = false;
+      let buffer = "";
+
+      while (!done) {
+        const result = await reader.read();
+        done = result.done || false;
+        const chunk = result.value ? decoder.decode(result.value, { stream: !done }) : "";
+        if (!chunk) continue;
+
+        buffer += chunk;
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          if (trimmed.startsWith("data:")) {
+            const payload = trimmed.slice(5).trim();
+            if (!payload || payload === "[DONE]") continue;
+
+            try {
+              const evt = JSON.parse(payload);
+              
+              // Handle text streaming from specific model
+              if (evt?.type === "text-delta" && evt.model && evt.delta) {
+                if (!modelResponses[evt.model]) {
+                  modelResponses[evt.model] = {
+                    model: evt.model,
+                    parts: [],
+                    show: false,
+                    selected: false
+                  };
+                }
+
+                const lastPart = modelResponses[evt.model].parts[modelResponses[evt.model].parts.length - 1];
+                if (lastPart && lastPart.type === 'text') {
+                  lastPart.text += evt.delta;
+                } else {
+                  modelResponses[evt.model].parts.push({
+                    type: 'text',
+                    text: evt.delta
+                  });
+                }
+
+                // Update UI with current state
+                get().upsertMultiModelMessage(assistantId, Object.values(modelResponses));
+              }
+              // Handle tool call start for specific model
+              else if (evt?.type === "tool-input-available" && evt.model && evt.toolCallId && evt.toolName) {
+                if (!modelResponses[evt.model]) {
+                  modelResponses[evt.model] = {
+                    model: evt.model,
+                    parts: [],
+                    show: false,
+                    selected: false
+                  };
+                }
+
+                modelResponses[evt.model].parts.push({
+                  type: 'tool-call',
+                  toolCallId: evt.toolCallId,
+                  toolName: evt.toolName,
+                  args: evt.input || {},
+                  result: null
+                });
+
+                // Update UI with current state
+                get().upsertMultiModelMessage(assistantId, Object.values(modelResponses));
+              }
+              // Handle tool result for specific model
+              else if (evt?.type === "tool-output-available" && evt.model && evt.toolCallId) {
+                if (modelResponses[evt.model]) {
+                  const toolCallPart = modelResponses[evt.model].parts.find(
+                    p => p.type === 'tool-call' && p.toolCallId === evt.toolCallId
+                  );
+                  if (toolCallPart) {
+                    toolCallPart.result = evt.output;
+                  }
+
+                  // Update UI with current state
+                  get().upsertMultiModelMessage(assistantId, Object.values(modelResponses));
+                }
+              }
+              // Handle model completion
+              else if (evt?.type === "model-complete" && evt.model) {
+                console.log(`Model ${evt.model} completed`);
+              }
+              // Handle final completion
+              else if (evt?.type === "complete") {
+                console.log('All models completed', evt);
+
+                // Update the message ID to match the server's saved message ID
+                if (evt.messageId && modelResponses) {
+                  // Find the assistant message and update its ID
+                  const { messages, setMessages } = get();
+                  const updatedMessages = messages.map(msg => {
+                    if (msg.id === assistantId) {
+                      return { ...msg, id: evt.messageId };
+                    }
+                    return msg;
+                  });
+                  setMessages(updatedMessages);
+
+                  // Also update in chatHistory
+                  const { chatHistory, setChatHistory, currentChatId } = get();
+                  const updatedChatHistory = chatHistory.map(chat => {
+                    if ((chat._id || chat.id) === currentChatId) {
+                      const updatedChatMessages = chat.messages.map(msg => {
+                        if (msg.id === assistantId) {
+                          return { ...msg, id: evt.messageId };
+                        }
+                        return msg;
+                      });
+                      return { ...chat, messages: updatedChatMessages };
+                    }
+                    return chat;
+                  });
+                  setChatHistory(updatedChatHistory);
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing SSE:', e);
+            }
+          }
+        }
+      }
+
+      // Flush remaining buffer
+      if (buffer) {
+        // Process remaining buffer if needed
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast.error(`Failed to send message: ${errorMessage}`);
+    } finally {
+      setStatus("ready");
+      setStreamingChatId(null);
+
+      // Update chat title after streaming completes
+      const { chatHistory, setChatHistory, currentChatId: finalChatId } = get();
+      const chatToUpdate = chatHistory.find(chat => (chat._id || chat.id) === finalChatId);
+      if (chatToUpdate && (chatToUpdate.title === 'New Chat' || chatToUpdate.title.length < 10) && chatToUpdate.messages.length >= 2) {
+        const userMessage = chatToUpdate.messages.find(msg => msg.role === 'user');
+        if (userMessage && userMessage.parts) {
+          const textPart = userMessage.parts.find(p => p.type === 'text');
+          const userText = textPart?.text || '';
+
+          if (userText.trim()) {
+            let newTitle = userText.substring(0, 50);
+            if (userText.length > 50) {
+              newTitle += '...';
+            }
+
+            // If the title would be too short, use more of the prompt
+            if (newTitle.length < 10 && userText.length > 10) {
+              newTitle = userText.substring(0, 100) + (userText.length > 100 ? '...' : '');
+            }
+
+            const updatedChatHistoryWithTitle = chatHistory.map(chat => {
+              if ((chat._id || chat.id) === finalChatId) {
+                return { ...chat, title: newTitle };
+              }
+              return chat;
+            });
+            setChatHistory(updatedChatHistoryWithTitle);
+            // Update title in database
+            get().updateChatTitle(finalChatId, newTitle);
+          }
+        }
+      }
+    }
+  },
+
+  // Upsert multi-model message
+  upsertMultiModelMessage: (assistantId, multiModelResponses) => {
+    const { messages, setMessages, chatHistory, setChatHistory, currentChatId, streamingChatId } = get();
+
+    const streamingChatData = chatHistory.find(chat => (chat._id || chat.id) === streamingChatId);
+    const baseMessages = streamingChatData ? streamingChatData.messages : messages;
+
+    let messageExists = false;
+    const updatedMessages = baseMessages.map((m) => {
+      if (m.id === assistantId) {
+        messageExists = true;
+        return {
+          ...m,
+          isMultiModel: true,
+          multiModelResponses
+        };
+      }
+      return m;
+    });
+
+    if (!messageExists) {
+      const newMessage = {
+        id: assistantId,
+        role: "assistant",
+        isMultiModel: true,
+        multiModelResponses
+      };
+      updatedMessages.push(newMessage);
+    }
+
+    // Only update UI messages if this is the current chat
+    if (currentChatId === streamingChatId) {
+      setMessages(updatedMessages);
+    }
+
+    // Update the streaming chat in chatHistory
+    const chatIdToUpdate = streamingChatId || currentChatId;
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === chatIdToUpdate
+        ? { ...chat, messages: updatedMessages }
+        : chat
+    );
+    setChatHistory(updatedChatHistory);
+  },
+
+  // Select model response
+  selectModelResponse: async (messageId, selectedModel) => {
+    const { currentChatId, messages, setMessages } = get();
+
+    try {
+      const response = await api.post('/chat/select-response', {
+        chatId: currentChatId,
+        messageId,
+        selectedModel
+      });
+
+      if (response.data.success) {
+        // Update local state
+        const updatedMessages = messages.map(msg => {
+          if (msg.id === messageId && msg.isMultiModel) {
+            return {
+              ...msg,
+              multiModelResponses: msg.multiModelResponses.map(r => ({
+                ...r,
+                show: r.model === selectedModel,
+                selected: r.model === selectedModel
+              }))
+            };
+          }
+          return msg;
+        });
+        setMessages(updatedMessages);
+        toast.success('Response selected successfully!');
+      }
+    } catch (error) {
+      console.error('Failed to select model response:', error);
+      toast.error('Failed to select response');
+    }
   },
 }));

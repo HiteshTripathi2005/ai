@@ -19,6 +19,8 @@ const HomePage = () => {
     currentChatId,
     isLoadingMessages,
     sendMessage,
+    sendMultiModelMessage,
+    selectModelResponse,
     handleNewChat,
     deleteChat,
     selectChat,
@@ -110,6 +112,7 @@ const HomePage = () => {
           status={computedStatus} 
           isAuthenticated={isAuthenticated} 
           isLoadingMessages={isLoadingMessages}
+          onSelectModel={selectModelResponse}
         />
       </div>
       {/* Fixed Composer */}
@@ -124,7 +127,17 @@ const HomePage = () => {
             } else {
               sendMessage(message, undefined, model);
             }
-          } : () => toast.error('Please login to send messages')} 
+          } : () => toast.error('Please login to send messages')}
+          onMultiModelSend={isAuthenticated ? async ({ message, models }) => {
+            if (location.pathname === '/' || currentChatId === "default-chat") {
+              const result = await handleNewChat(navigate);
+              if (result && result.success) {
+                sendMultiModelMessage(message, models);
+              }
+            } else {
+              sendMultiModelMessage(message, models);
+            }
+          } : () => toast.error('Please login to send messages')}
           isStreaming={isStreaming} 
           width={sidebarW} 
           disabled={!isAuthenticated}
