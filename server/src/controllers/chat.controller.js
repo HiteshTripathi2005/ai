@@ -83,12 +83,73 @@ export const chat = async (req, res) => {
 
         console.log("available tools:", Object.keys(mergedTools));
 
+        // Build messages array with system prompt and conversation history
+        const buildMessagesArray = async (chat, currentPrompt, userId) => {
+            const messages = [];
+
+            // Add system message
+            messages.push({
+                role: 'system',
+                content: systemPrompt
+            });
+
+            // Get past messages from current chat only (excluding the current user message we just added)
+            const currentChatPastMessages = chat.messages.slice(0, -1); // Exclude the last message (current user prompt)
+
+            // Take last 10 messages from current chat to keep context manageable
+            const recentMessages = currentChatPastMessages.slice(-10);
+
+            // Convert past messages to simplified format (only text and tool call names)
+            for (const msg of recentMessages) {
+                if (msg.role === 'user' || msg.role === 'assistant') {
+                    const content = [];
+
+                    // Extract text content
+                    const textParts = msg.parts.filter(p => p.type === 'text');
+                    for (const textPart of textParts) {
+                        if (textPart.text && textPart.text.trim()) {
+                            content.push({
+                                type: 'text',
+                                text: textPart.text
+                            });
+                        }
+                    }
+
+                    // Extract tool call names (simplified, no args to reduce size)
+                    const toolCallParts = msg.parts.filter(p => p.type === 'tool-call');
+                    for (const toolCallPart of toolCallParts) {
+                        content.push({
+                            type: 'text',
+                            text: `Used tool: ${toolCallPart.toolName}`
+                        });
+                    }
+
+                    if (content.length > 0) {
+                        messages.push({
+                            role: msg.role,
+                            content: content
+                        });
+                    }
+                }
+            }
+
+            // Add current user prompt
+            messages.push({
+                role: 'user',
+                content: currentPrompt
+            });
+
+            return messages;
+        };
+
+        const messages = await buildMessagesArray(chat, prompt, userId);
+
         const result = await streamText({
             model: selectedModel,
-            system: systemPrompt,
-            prompt,
+            messages,
             stopWhen: stepCountIs(10),
             tools: mergedTools,
+            experimental_context: {userId: userId},
             onStepFinish: async (step) => {
                 console.log('Step finished:', 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
                 

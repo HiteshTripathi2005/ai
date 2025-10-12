@@ -3,6 +3,7 @@ import cors from "cors";
 import connectDB from "./config/database.js";
 import chatRouter from "./routes/chat.js";
 import authRouter from "./routes/auth.js";
+import taskRouter from "./routes/task.js";
 import cookie_parser from "cookie-parser";
 
 const app = express();
@@ -23,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/chat", chatRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/tasks", taskRouter);
 
 // Health check
 app.get("/api/health", (req, res) => {
