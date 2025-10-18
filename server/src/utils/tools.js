@@ -2,6 +2,7 @@ import { tool } from "ai";
 import z from "zod";
 import Task from '../models/Task.js';
 import { mcpToolsFromSmithery } from './mcp.js';
+import { listEvents } from "../tools/calendar-tool.js";
 
 // Local time tool definition
 const timeTool = tool({
@@ -193,46 +194,3 @@ const taskTool = tool({
 });
 
 export { timeTool, taskTool };
-
-
-// 🧩 Merge local tools with MCP tools (connects on-demand)
-export async function getMergedTools() {
-    try {
-        // Establish MCP connection on-demand
-        console.log("🔄 Connecting to MCP services for this request...");
-        const mcpResult = await mcpToolsFromSmithery();
-
-        if (mcpResult && mcpResult.tools) {
-            const mcpTools = mcpResult.tools;
-
-            // Merge remote tools with local tools
-            const mergedTools = {
-                ...mcpTools,
-                getCurrentTime: timeTool,
-                taskTool: taskTool
-            };
-
-            const toolCount = Object.keys(mcpTools).length;
-            console.log(`✅ Successfully connected to MCP services. ${toolCount} tools available.`);
-            console.log(`🛠️ Merged tools available: ${Object.keys(mergedTools).join(", ")}`);
-
-            return {
-                tools: mergedTools,
-                close: mcpResult.close
-            };
-        } else {
-            // No MCP client available, use local tools only
-            console.log(`🛠️ Using local tools only (MCP connection failed)`);
-            return {
-                tools: { getCurrentTime: timeTool, taskTool: taskTool },
-                close: async () => {}
-            };
-        }
-    } catch (error) {
-        console.warn(`⚠️ Failed to connect to MCP services: ${error.message}. Using local tools only.`);
-        return {
-            tools: { getCurrentTime: timeTool, taskTool: taskTool },
-            close: async () => {}
-        };
-    }
-}

@@ -101,7 +101,7 @@ export const useChatStore = create((set, get) => ({
     let assistantMessage = null;
 
     try {
-      const response = await fetch('http://localhost:5000/api/chat', {
+      const response = await fetch('http://localhost:8080/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -709,7 +709,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     try {
-      const response = await fetch('http://localhost:5000/api/chat/multi-model', {
+      const response = await fetch('http://localhost:8080/api/chat/multi-model', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

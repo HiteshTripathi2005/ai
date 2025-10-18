@@ -5,9 +5,18 @@ import chatRouter from "./routes/chat.js";
 import authRouter from "./routes/auth.js";
 import taskRouter from "./routes/task.js";
 import cookie_parser from "cookie-parser";
+import {google} from 'googleapis'
+import googleAuthRouter from "./routes/google-auth.js";
+import { config } from "dotenv";
+config();
 
 const app = express();
 
+export const googleClient = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.SECRET_ID,
+    process.env.REDIRECT
+)
 // Connect to MongoDB
 connectDB();
 
@@ -25,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/chat", chatRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/tasks", taskRouter);
-
+app.use("/google", googleAuthRouter);
 // Health check
 app.get("/api/health", (req, res) => {
     res.json({ status: "OK", message: "Server is running" });

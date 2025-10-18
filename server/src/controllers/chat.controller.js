@@ -1,14 +1,25 @@
 import {createOpenRouter} from "@openrouter/ai-sdk-provider"
 import { smoothStream, stepCountIs, streamText } from 'ai';
-import { getMergedTools } from '../utils/tools.js';
 import { systemPrompt } from '../utils/systemPrompt.js';
 import Chat from '../models/Chat.js';
+import { taskTool, timeTool } from "../utils/tools.js";
+import { listEvents, createEvent, listCalendars, deleteEvent, createCalendar, deleteCalendar } from "../tools/calendar-tool.js";
 
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
+const tools = {
+    getCurrentTime: timeTool,
+    task: taskTool,
+    listEvents: listEvents,
+    listCalendars: listCalendars,
+    createEvent: createEvent,
+    deleteEvent: deleteEvent,
+    createCalendar: createCalendar,
+    deleteCalendar: deleteCalendar,
+}
 
 export const chat = async (req, res) => {
     try {
@@ -55,9 +66,6 @@ export const chat = async (req, res) => {
             parts: []
         };
 
-        // Load merged tools (local + MCP)
-        const { tools: mergedTools, close: closeMcp } = await getMergedTools();
-
         // Select model based on request
         let selectedModel;
         switch (model) {
@@ -80,8 +88,6 @@ export const chat = async (req, res) => {
                 selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
                 break;
         }
-
-        console.log("available tools:", Object.keys(mergedTools));
 
         // Build messages array with system prompt and conversation history
         const buildMessagesArray = async (chat, currentPrompt, userId) => {
@@ -144,11 +150,13 @@ export const chat = async (req, res) => {
 
         const messages = await buildMessagesArray(chat, prompt, userId);
 
+        console.log("tools names:", Object.keys(tools));
+
         const result = await streamText({
             model: selectedModel,
             messages,
             stopWhen: stepCountIs(10),
-            tools: mergedTools,
+            tools: tools,
             experimental_context: {userId: userId},
             onStepFinish: async (step) => {
                 console.log('Step finished:', 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
@@ -252,16 +260,6 @@ export const chat = async (req, res) => {
             }
         }).catch(error => {
             console.error('Error getting final text:', error);
-        });
-
-        // Set up cleanup after response is finished
-        res.on('finish', async () => {
-            try {
-                await closeMcp();
-                console.log('MCP connections closed successfully');
-            } catch (closeError) {
-                console.warn('Error closing MCP connections:', closeError);
-            }
         });
 
         return originalResponse;
@@ -498,11 +496,6 @@ export const multiModelChat = async (req, res) => {
             multiModelResponses: []
         };
 
-        // Load merged tools (local + MCP)
-        const { tools: mergedTools, close: closeMcp } = await getMergedTools();
-
-        console.log("available tools:", Object.keys(mergedTools));
-
         // Set up SSE headers
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -527,7 +520,7 @@ export const multiModelChat = async (req, res) => {
                     system: systemPrompt,
                     prompt,
                     stopWhen: stepCountIs(10),
-                    tools: mergedTools,
+                    tools: tools,
                     onStepFinish: async (step) => {
                         console.log(`[${modelName}] Step finished:`, 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
 
@@ -646,13 +639,6 @@ export const multiModelChat = async (req, res) => {
 
         res.end();
 
-        // Close MCP connections
-        try {
-            await closeMcp();
-            console.log('MCP connections closed successfully');
-        } catch (closeError) {
-            console.warn('Error closing MCP connections:', closeError);
-        }
 
     } catch (error) {
         console.error("Error occurred while processing multi-model chat:", error);

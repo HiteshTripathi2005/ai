@@ -3,7 +3,7 @@ import {config} from "dotenv";
 
 config();
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 // Start server without MCP initialization
 app.listen(PORT, () => {

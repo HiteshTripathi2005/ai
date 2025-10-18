@@ -38,7 +38,7 @@ A Node.js/Express backend for an AI chat application with MongoDB, JWT authentic
    MONGODB_URI=mongodb://localhost:27017/ai-chat
    JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
    JWT_EXPIRE=7d
-   PORT=5000
+   PORT=8080
    NODE_ENV=development
    CLIENT_URL=http://localhost:5173
    GOOGLE_GENERATIVE_AI_API_KEY=your-google-ai-api-key

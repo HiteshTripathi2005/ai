@@ -43,14 +43,17 @@ function MessageBubble({ msg, onSelectModel }) {
         <div key={`part-${msg.id}-${index}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
           <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
             <div className={`inline-block px-4 py-3 rounded-lg ${isUser ? "bg-zinc-100 dark:bg-zinc-800" : "bg-zinc-50 dark:bg-zinc-900"}`}>
-              <div className={`text-sm leading-relaxed ${isUser ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-700 dark:text-zinc-300"}`}>
-                {isUser ? (
-                  <div className="whitespace-pre-wrap">{part.text}</div>
-                ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {part.text}
-                  </ReactMarkdown>
-                )}
+              <div className="markdown-content">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    ul: ({children}) => <ul style={{listStyleType: 'disc'}}>{children}</ul>,
+                    ol: ({children}) => <ol style={{listStyleType: 'decimal'}}>{children}</ol>,
+                    li: ({children}) => <li>{children}</li>
+                  }}
+                >
+                  {part.text}
+                </ReactMarkdown>
               </div>
             </div>
             {/* Time and Copy Button */}

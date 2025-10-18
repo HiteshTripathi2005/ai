@@ -86,14 +86,14 @@ export async function mcpToolsFromSmithery(urls) {
     const baseUrls = urls && urls.length > 0
         ? urls
         : [
-                "https://server.smithery.ai/exa/mcp",
+                // "https://server.smithery.ai/exa/mcp",
                 // "https://server.smithery.ai/@esshka/okx-mcp/mcp",
                 // "https://server.smithery.ai/@cloudflare/playwright-mcp/mcp",
                 // "https://server.smithery.ai/@hwangwoohyun-nav/yahoo-finance-mcp/mcp",
                 // "https://server.smithery.ai/@imbenrabi/financial-modeling-prep-mcp-server/mcp",
                 // "https://server.smithery.ai/@HarunGuclu/weather_mcp/mcp",
-                "https://server.smithery.ai/@smithery-ai/github/mcp",
-                "https://server.smithery.ai/@githejie/mcp-server-calculator/mcp"
+                // "https://server.smithery.ai/@smithery-ai/github/mcp",
+                // "https://server.smithery.ai/@githejie/mcp-server-calculator/mcp"
                 // "https://server.smithery.ai/@glassBead-tc/weather-mcp/mcp",
                 // "https://server.smithery.ai/@nickclyde/duckduckgo-mcp-server/mcp",
             ];

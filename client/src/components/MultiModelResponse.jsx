@@ -27,8 +27,15 @@ function MultiModelResponse({ msg, onSelectModel }) {
     return parts.map((part, index) => {
       if (part.type === 'text') {
         return (
-          <div key={`part-${index}`} className="prose prose-zinc dark:prose-invert max-w-none prose-p:my-2">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <div key={`part-${index}`} className="markdown-content">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                ul: ({children}) => <ul style={{listStyleType: 'disc'}}>{children}</ul>,
+                ol: ({children}) => <ol style={{listStyleType: 'decimal'}}>{children}</ol>,
+                li: ({children}) => <li>{children}</li>
+              }}
+            >
               {part.text}
             </ReactMarkdown>
           </div>
