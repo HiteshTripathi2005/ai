@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import z from "zod";
 import Task from '../models/Task.js';
+import { mcpToolsFromSmithery } from './mcp.js';
 
 // Local time tool definition
 const timeTool = tool({
@@ -194,11 +195,12 @@ const taskTool = tool({
 export { timeTool, taskTool };
 
 
-// 🧩 Merge local tools with MCP tools
+// 🧩 Merge local tools with MCP tools (connects on-demand)
 export async function getMergedTools() {
     try {
-        // Use global MCP client if available
-        const mcpResult = global.mcpClient;
+        // Establish MCP connection on-demand
+        console.log("🔄 Connecting to MCP services for this request...");
+        const mcpResult = await mcpToolsFromSmithery();
 
         if (mcpResult && mcpResult.tools) {
             const mcpTools = mcpResult.tools;
@@ -210,6 +212,8 @@ export async function getMergedTools() {
                 taskTool: taskTool
             };
 
+            const toolCount = Object.keys(mcpTools).length;
+            console.log(`✅ Successfully connected to MCP services. ${toolCount} tools available.`);
             console.log(`🛠️ Merged tools available: ${Object.keys(mergedTools).join(", ")}`);
 
             return {
@@ -218,14 +222,14 @@ export async function getMergedTools() {
             };
         } else {
             // No MCP client available, use local tools only
-            console.log(`🛠️ Using local tools only (no MCP connection)`);
+            console.log(`🛠️ Using local tools only (MCP connection failed)`);
             return {
                 tools: { getCurrentTime: timeTool, taskTool: taskTool },
                 close: async () => {}
             };
         }
     } catch (error) {
-        console.warn(`⚠️ Failed to load MCP tools: ${error.message}. Using local tools only.`);
+        console.warn(`⚠️ Failed to connect to MCP services: ${error.message}. Using local tools only.`);
         return {
             tools: { getCurrentTime: timeTool, taskTool: taskTool },
             close: async () => {}
