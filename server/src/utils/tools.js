@@ -1,13 +1,6 @@
 import { tool } from "ai";
 import z from "zod";
 import Task from '../models/Task.js';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import Exa from 'exa-js';
-
-const google = createGoogleGenerativeAI({
-    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY || ""
-});
-
 
 // Local time tool definition
 const timeTool = tool({
@@ -198,112 +191,7 @@ const taskTool = tool({
     }
 });
 
-// Exa Search tool definition
-const exaSearchTool = tool({
-    name: "exaSearch",
-    description: "Advanced web search using Exa API for finding relevant web content, articles, and information with optional content extraction.",
-    inputSchema: z.object({
-        query: z.string().describe("The search query to find relevant web content."),
-        numResults: z.number().min(1).max(10).default(5).describe("Number of results to return (1-10)."),
-        includeDomains: z.array(z.string()).optional().describe("Specific domains to include in search results."),
-        excludeDomains: z.array(z.string()).optional().describe("Domains to exclude from search results."),
-        startPublishedDate: z.string().optional().describe("Start date for search results in YYYY-MM-DD format."),
-        endPublishedDate: z.string().optional().describe("End date for search results in YYYY-MM-DD format."),
-        category: z.enum(['company', 'research paper', 'news', 'linkedin profile', 'github', 'tweet', 'movie', 'song', 'personal site', 'pdf', 'financial report']).optional().describe("Content category to focus on."),
-        text: z.boolean().default(true).optional().describe("Include full text content of results."),
-        highlights: z.boolean().optional().describe("Include highlights of the content in results.")
-    }),
-    execute: async (input) => {
-        const { query, numResults, includeDomains, excludeDomains, startPublishedDate, endPublishedDate, category, text, highlights } = input;
-
-        console.log(`🔍 Performing Exa search for: "${query}" with ${numResults} results`);
-
-        try {
-            const apiKey = process.env.EXA_API_KEY;
-            if (!apiKey) {
-                throw new Error('EXA_API_KEY environment variable is not set');
-            }
-
-            // Initialize Exa client
-            const exa = new Exa(apiKey);
-
-            // Prepare search options
-            const searchOptions = {
-                numResults,
-                includeDomains,
-                excludeDomains,
-                startPublishedDate,
-                endPublishedDate,
-                category,
-                text,
-                highlights
-            };
-
-            // Remove undefined values
-            Object.keys(searchOptions).forEach(key => {
-                if (searchOptions[key] === undefined) {
-                    delete searchOptions[key];
-                }
-            });
-
-            // Perform search using Exa SDK
-            let searchResult;
-            if (text || highlights) {
-                // Use searchAndContents for full content
-                searchResult = await exa.searchAndContents(query, searchOptions);
-            } else {
-                // Use basic search
-                searchResult = await exa.search(query, searchOptions);
-            }
-
-            // Format the results for better readability
-            const formattedResults = searchResult.results.map((result, index) => ({
-                rank: index + 1,
-                title: result.title,
-                url: result.url,
-                id: result.id,
-                publishedDate: result.publishedDate,
-                author: result.author,
-                ...(result.text && { text: result.text }),
-                ...(result.highlights && {
-                    highlights: result.highlights,
-                    highlightScores: result.highlightScores
-                })
-            }));
-
-            console.log(`✅ Exa search completed: Found ${formattedResults.length} results for "${query}"`);
-
-            return {
-                query,
-                totalResults: formattedResults.length,
-                results: formattedResults,
-                searchParameters: {
-                    numResults,
-                    includeDomains,
-                    excludeDomains,
-                    startPublishedDate,
-                    endPublishedDate,
-                    category,
-                    text,
-                    highlights
-                }
-            };
-
-        } catch (error) {
-            console.error(`❌ Exa search failed for "${query}": ${error.message}`);
-
-            // Return a helpful error response
-            return {
-                error: true,
-                query,
-                message: `Search failed: ${error.message}`,
-                suggestion: "Try rephrasing your query or check your internet connection."
-            };
-        }
-    }
-});
-
-export { timeTool, taskTool, exaSearchTool };
+export { timeTool, taskTool };
 
 
 // 🧩 Merge local tools with MCP tools
@@ -319,9 +207,7 @@ export async function getMergedTools() {
             const mergedTools = {
                 ...mcpTools,
                 getCurrentTime: timeTool,
-                taskTool: taskTool,
-                exaSearch: exaSearchTool,
-                webSearch: google.tools.googleSearch
+                taskTool: taskTool
             };
 
             console.log(`🛠️ Merged tools available: ${Object.keys(mergedTools).join(", ")}`);
@@ -334,14 +220,14 @@ export async function getMergedTools() {
             // No MCP client available, use local tools only
             console.log(`🛠️ Using local tools only (no MCP connection)`);
             return {
-                tools: { getCurrentTime: timeTool, taskTool: taskTool, exaSearch: exaSearchTool, webSearch: google.tools.googleSearch },
+                tools: { getCurrentTime: timeTool, taskTool: taskTool },
                 close: async () => {}
             };
         }
     } catch (error) {
         console.warn(`⚠️ Failed to load MCP tools: ${error.message}. Using local tools only.`);
         return {
-            tools: { getCurrentTime: timeTool, taskTool: taskTool, exaSearch: exaSearchTool, webSearch: google.tools.googleSearch },
+            tools: { getCurrentTime: timeTool, taskTool: taskTool },
             close: async () => {}
         };
     }
