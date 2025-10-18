@@ -86,7 +86,7 @@ export async function mcpToolsFromSmithery(urls) {
     const baseUrls = urls && urls.length > 0
         ? urls
         : [
-                "https://server.smithery.ai/exa/mcp",
+                // "https://server.smithery.ai/exa/mcp",
                 // "https://server.smithery.ai/@esshka/okx-mcp/mcp",
                 "https://server.smithery.ai/@cloudflare/playwright-mcp/mcp",
                 // "https://server.smithery.ai/@hwangwoohyun-nav/yahoo-finance-mcp/mcp",

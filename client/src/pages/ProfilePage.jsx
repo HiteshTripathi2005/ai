@@ -142,10 +142,7 @@ const ProfilePage = () => {
                 <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
                   {user.name}
                 </h2>
-                <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-                  <Shield className="h-4 w-4" />
-                  <span className="capitalize">{user.role}</span>
-                </div>
+               
 
                 {/* Join Date */}
                 <div className="text-xs text-zinc-400 dark:text-zinc-500">
@@ -283,28 +280,7 @@ const ProfilePage = () => {
                         )}
                       </div>
 
-                      {/* Account Info */}
-                      <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                        <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
-                          Account Information
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
-                            <Shield className="h-5 w-5 text-zinc-400" />
-                            <div>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400">Role</p>
-                              <p className="text-sm text-zinc-900 dark:text-zinc-100 capitalize">{user.role}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
-                            <Calendar className="h-5 w-5 text-zinc-400" />
-                            <div>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400">Joined</p>
-                              <p className="text-sm text-zinc-900 dark:text-zinc-100">{formatDate(user.createdAt)}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                    
                     </div>
                   </div>
                 ) : (

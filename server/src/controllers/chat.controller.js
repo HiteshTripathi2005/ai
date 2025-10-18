@@ -62,7 +62,7 @@ export const chat = async (req, res) => {
         let selectedModel;
         switch (model) {
             case "gemini-2.0-flash-exp":
-                selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
+                selectedModel = openrouter.chat('google/gemini-2.5-flash');
                 break;
             case "z-ai/glm-4.5-air:free":
                 selectedModel = openrouter.chat('z-ai/glm-4.5-air:free');
@@ -77,7 +77,7 @@ export const chat = async (req, res) => {
                 selectedModel = openrouter.chat('openai/gpt-oss-20b:free');
                 break;
             default:
-                selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
+                selectedModel = openrouter.chat('google/gemini-2.5-flash');
                 break;
         }
 
