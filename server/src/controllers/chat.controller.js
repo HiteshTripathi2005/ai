@@ -5,6 +5,7 @@ import Chat from '../models/Chat.js';
 import { taskTool, timeTool } from "../utils/tools.js";
 import { listEvents, createEvent, listCalendars, deleteEvent, createCalendar, deleteCalendar } from "../tools/calendar-tool.js";
 import { listEmails, sendEmail } from "../tools/gmail-tool.js";
+import { mcpToolsFromSmithery } from "../utils/mcp.js";
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -92,74 +93,18 @@ export const chat = async (req, res) => {
                 break;
         }
 
-        // Build messages array with system prompt and conversation history
-        const buildMessagesArray = async (chat, currentPrompt, userId) => {
-            const messages = [];
-
-            // Add system message
-            messages.push({
-                role: 'system',
-                content: systemPrompt
-            });
-
-            // Get past messages from current chat only (excluding the current user message we just added)
-            const currentChatPastMessages = chat.messages.slice(0, -1); // Exclude the last message (current user prompt)
-
-            // Take last 10 messages from current chat to keep context manageable
-            const recentMessages = currentChatPastMessages.slice(-10);
-
-            // Convert past messages to simplified format (only text and tool call names)
-            for (const msg of recentMessages) {
-                if (msg.role === 'user' || msg.role === 'assistant') {
-                    const content = [];
-
-                    // Extract text content
-                    const textParts = msg.parts.filter(p => p.type === 'text');
-                    for (const textPart of textParts) {
-                        if (textPart.text && textPart.text.trim()) {
-                            content.push({
-                                type: 'text',
-                                text: textPart.text
-                            });
-                        }
-                    }
-
-                    // Extract tool call names (simplified, no args to reduce size)
-                    const toolCallParts = msg.parts.filter(p => p.type === 'tool-call');
-                    for (const toolCallPart of toolCallParts) {
-                        content.push({
-                            type: 'text',
-                            text: `Used tool: ${toolCallPart.toolName}`
-                        });
-                    }
-
-                    if (content.length > 0) {
-                        messages.push({
-                            role: msg.role,
-                            content: content
-                        });
-                    }
-                }
-            }
-
-            // Add current user prompt
-            messages.push({
-                role: 'user',
-                content: currentPrompt
-            });
-
-            return messages;
-        };
-
         const messages = await buildMessagesArray(chat, prompt, userId);
 
-        console.log("tools names:", Object.keys(tools));
+        const { tools: mcpTools, close: closeMcpTools } = await mcpToolsFromSmithery();
+        const allTools = { ...tools, ...mcpTools };
+
+        console.log("allTools names:", Object.keys(allTools));
 
         const result = await streamText({
             model: selectedModel,
             messages,
             stopWhen: stepCountIs(10),
-            tools: tools,
+            tools: allTools,
             experimental_context: {user: user},
             onStepFinish: async (step) => {
                 console.log('Step finished:', 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
@@ -263,6 +208,9 @@ export const chat = async (req, res) => {
             }
         }).catch(error => {
             console.error('Error getting final text:', error);
+        }).finally(async () => {
+            await closeMcpTools();
+            console.log('MCP tools closed');
         });
 
         return originalResponse;
@@ -517,13 +465,16 @@ export const multiModelChat = async (req, res) => {
                 selected: false
             };
 
+            const { tools: mcpTools, close: closeMcpTools } = await mcpToolsFromSmithery();
+            const allTools = { ...tools, ...mcpTools };
+
             try {
                 const result = await streamText({
                     model: modelInstance,
                     system: systemPrompt,
                     prompt,
                     stopWhen: stepCountIs(10),
-                    tools: tools,
+                    tools: allTools,
                     onStepFinish: async (step) => {
                         console.log(`[${modelName}] Step finished:`, 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
 
@@ -620,6 +571,9 @@ export const multiModelChat = async (req, res) => {
                     text: `Error: Failed to get response from ${modelName}`
                 });
                 modelResponses[modelName] = modelResponse;
+            } finally {
+                await closeMcpTools();
+                console.log(`MCP tools closed`);
             }
         });
 
@@ -720,3 +674,63 @@ export const selectModelResponse = async (req, res) => {
         });
     }
 }
+
+
+// Build messages array with system prompt and conversation history
+const buildMessagesArray = async (chat, currentPrompt, userId) => {
+    const messages = [];
+
+    // Add system message
+    messages.push({
+        role: 'system',
+        content: systemPrompt
+    });
+
+    // Get past messages from current chat only (excluding the current user message we just added)
+    const currentChatPastMessages = chat.messages.slice(0, -1); // Exclude the last message (current user prompt)
+
+    // Take last 10 messages from current chat to keep context manageable
+    const recentMessages = currentChatPastMessages.slice(-10);
+
+    // Convert past messages to simplified format (only text and tool call names)
+    for (const msg of recentMessages) {
+        if (msg.role === 'user' || msg.role === 'assistant') {
+            const content = [];
+
+            // Extract text content
+            const textParts = msg.parts.filter(p => p.type === 'text');
+            for (const textPart of textParts) {
+                if (textPart.text && textPart.text.trim()) {
+                    content.push({
+                        type: 'text',
+                        text: textPart.text
+                    });
+                }
+            }
+
+            // Extract tool call names (simplified, no args to reduce size)
+            const toolCallParts = msg.parts.filter(p => p.type === 'tool-call');
+            for (const toolCallPart of toolCallParts) {
+                content.push({
+                    type: 'text',
+                    text: `Used tool: ${toolCallPart.toolName}`
+                });
+            }
+
+            if (content.length > 0) {
+                messages.push({
+                    role: msg.role,
+                    content: content
+                });
+            }
+        }
+    }
+
+    // Add current user prompt
+    messages.push({
+        role: 'user',
+        content: currentPrompt
+    });
+
+    return messages;
+};
