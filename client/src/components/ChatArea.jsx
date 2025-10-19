@@ -161,7 +161,7 @@ export default function ChatArea({ messages, status, isAuthenticated, isLoadingM
         id="messages-root"
       >
         {messages.length === 0 && !isLoadingMessages ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 h-[calc(100vh-200px)] flex items-center justify-center">
             <div className="text-center max-w-md mx-auto px-6">
               <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 mb-3">
                 Welcome to AI Chat

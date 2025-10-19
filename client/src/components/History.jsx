@@ -95,9 +95,7 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
         <motion.div
           animate={{ width: open ? (collapsed ? 60 : width) : 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className={`h-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-lg overflow-hidden flex flex-col border-r border-zinc-200 dark:border-zinc-800 ${
-            open ? '' : 'w-0'
-          }`}
+          className="h-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 shadow-lg overflow-hidden flex flex-col border-r border-zinc-200 dark:border-zinc-800"
         >
           {open && (
             <>
