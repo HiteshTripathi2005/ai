@@ -4,7 +4,7 @@ import { systemPrompt } from '../utils/systemPrompt.js';
 import Chat from '../models/Chat.js';
 import { taskTool, timeTool } from "../utils/tools.js";
 import { listEvents, createEvent, listCalendars, deleteEvent, createCalendar, deleteCalendar } from "../tools/calendar-tool.js";
-
+import { listEmails, sendEmail } from "../tools/gmail-tool.js";
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -19,6 +19,8 @@ const tools = {
     deleteEvent: deleteEvent,
     createCalendar: createCalendar,
     deleteCalendar: deleteCalendar,
+    listEmails: listEmails,
+    sendEmail: sendEmail,
 }
 
 export const chat = async (req, res) => {

@@ -7,7 +7,7 @@ router.get('/google-auth', (req, res) => {
   try {
       const authUrl = googleClient.generateAuthUrl({
           access_type: 'offline',
-          scope: ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar'],
+          scope: [ 'https://www.googleapis.com/auth/calendar', 'https://mail.google.com/'],
           prompt: 'consent'
       })
       res.redirect(authUrl)
