@@ -123,7 +123,7 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
                       isAuthenticated
                         ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90'
                         : 'bg-zinc-200 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600',
-                      collapsed ? 'p-1' : 'p-3'
+                      collapsed ? 'p-1' : 'p-2'
                     )}
                   >
                     <Plus size={18} />

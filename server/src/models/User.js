@@ -33,6 +33,12 @@ const userSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  googleTokens: {
+    tokens: {
+      type: Object,
+      default: null
+    }
   }
 }, {
   timestamps: true

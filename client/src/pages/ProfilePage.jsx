@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Calendar, Shield, Edit2, Save, X, ArrowLeft, CheckSquare } from 'lucide-react';
+import { User, Mail, Calendar, Shield, Edit2, Save, X, ArrowLeft, CheckSquare, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import TaskManager from '../components/TaskManager';
@@ -142,9 +142,22 @@ const ProfilePage = () => {
                 <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
                   {user.name}
                 </h2>
-                <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400 mb-1">
                   <Shield className="h-4 w-4" />
                   <span className="capitalize">{user.role}</span>
+                </div>
+                <div className="mb-2">
+                  {user.googleTokens ? (
+                    <div className="flex items-center gap-2">
+                      <Check className="h-4 w-4 text-green-500" />
+                      <span className="text-sm text-zinc-500 dark:text-zinc-400">Google account connected</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <X className="h-4 w-4 text-red-500" />
+                      <span className="text-sm text-zinc-500 dark:text-zinc-400">Google account not connected</span>
+                    </div>
+                    )}
                 </div>
 
                 {/* Join Date */}
@@ -304,6 +317,14 @@ const ProfilePage = () => {
                             </div>
                           </div>
                         </div>
+                      </div>
+                      <div>
+                        {/* redirect to google auth page of 8000 port */}
+                        <button className="w-full p-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 cursor-pointer">
+                          <a href={`http://localhost:8080/google/google-auth?userId=${user.id}`} target="_blank">
+                            {user.googleTokens ? 'Change google account' : 'Connect google account'}
+                          </a>
+                        </button>
                       </div>
                     </div>
                   </div>

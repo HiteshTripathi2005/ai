@@ -27,6 +27,7 @@ export const chat = async (req, res) => {
     try {
         const { prompt, chatId, model } = req.body;
         const userId = req.user._id;
+        const user = req.user;
 
         console.log("Received prompt:", prompt);
 
@@ -159,7 +160,7 @@ export const chat = async (req, res) => {
             messages,
             stopWhen: stepCountIs(10),
             tools: tools,
-            experimental_context: {userId: userId},
+            experimental_context: {user: user},
             onStepFinish: async (step) => {
                 console.log('Step finished:', 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
                 

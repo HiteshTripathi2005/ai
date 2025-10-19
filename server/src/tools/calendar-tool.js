@@ -10,13 +10,11 @@ const listEvents = tool({
         calendarId: z.string().optional().default("primary").describe("The ID of the calendar to list events from. Default is the primary calendar."),
         maxResults: z.number().optional().default(10).describe("The maximum number of events to return. Default is 10."),
     }),
-    execute: async (input) => {
+    execute: async (input, { experimental_context: context }) => {
         const { calendarId, maxResults } = input;
         try {
-            console.log("REFRESH_TOKEN:", process.env.REFRESH_TOKEN);
-
             googleClient.setCredentials({
-                refresh_token: process.env.REFRESH_TOKEN
+                refresh_token: context.user.googleTokens.tokens.refresh_token
             });
             
             console.log("Listing events for calendar:", calendarId);
@@ -52,12 +50,12 @@ const createEvent = tool({
             }),
         }),
     }),
-    execute: async (input) => {
+    execute: async (input, { experimental_context: context }) => {
         const { calendarId, event } = input;
         try {
             console.log("Creating event for calendar:", calendarId);
             googleClient.setCredentials({
-                refresh_token: process.env.REFRESH_TOKEN
+                refresh_token: context.user.googleTokens.tokens.refresh_token
             });
             const calendar = google.calendar({ version: "v3", auth: googleClient });
             const response = await calendar.events.insert({
@@ -91,12 +89,12 @@ const deleteEvent = tool({
         calendarId: z.string().optional().default("primary").describe("The ID of the calendar to delete the event from."),
         eventId: z.string().describe("The ID of the event to delete."),
     }),
-    execute: async (input) => {
+    execute: async (input, { experimental_context: context }) => {
         const { calendarId, eventId } = input;
         try {
             console.log("Deleting event for calendar:", calendarId);
             googleClient.setCredentials({
-                refresh_token: process.env.REFRESH_TOKEN
+                refresh_token: context.user.googleTokens.tokens.refresh_token
             });
             const calendar = google.calendar({ version: "v3", auth: googleClient });
             const response = await calendar.events.delete({
@@ -118,12 +116,12 @@ const listCalendars = tool({
     inputSchema: z.object({
         maxResults: z.number().optional().default(10),
     }),
-    execute: async ( input ) => {
+    execute: async ( input, { experimental_context: context }) => {
         const { maxResults } = input;
         try {
             console.log("Listing calendars for the user with maxResults:", maxResults);
             googleClient.setCredentials({
-                refresh_token: process.env.REFRESH_TOKEN
+                refresh_token: context.user.googleTokens.tokens.refresh_token
             });
             const calendar = google.calendar({ version: "v3", auth: googleClient });
             const response = await calendar.calendarList.list({
@@ -144,12 +142,12 @@ const createCalendar = tool({
     inputSchema: z.object({
         summary: z.string().describe("The summary of the calendar."),
     }),
-    execute: async (input) => {
+    execute: async (input, { experimental_context: context }) => {
         const { summary } = input;
         try {
             console.log("Creating calendar for the user:", summary);
             googleClient.setCredentials({
-                refresh_token: process.env.REFRESH_TOKEN
+                refresh_token: context.user.googleTokens.tokens.refresh_token
             });
             const calendar = google.calendar({ version: "v3", auth: googleClient });
             const response = await calendar.calendars.insert({
@@ -170,12 +168,12 @@ const deleteCalendar = tool({
     inputSchema: z.object({
         calendarId: z.string().describe("The ID of the calendar to delete."),
     }),
-    execute: async (input) => {
+    execute: async (input, { experimental_context: context }) => {
         const { calendarId } = input;
         try {
         console.log("Deleting calendar for the user:", calendarId);
         googleClient.setCredentials({
-            refresh_token: process.env.REFRESH_TOKEN
+            refresh_token: context.user.googleTokens.tokens.refresh_token
         });
         const calendar = google.calendar({ version: "v3", auth: googleClient });
         const response = await calendar.calendars.delete({

@@ -23,29 +23,30 @@ const listEmails = tool({
         endDate: z.string().optional().describe("The end date of the emails to return in YYYY/MM/DD format. Default is today."),
         query: z.string().optional().describe("The query to search for emails. Default is empty."),
     }),
-    execute: async (input) => {
+    execute: async (input, { experimental_context: context }) => {
         let { maxResults, startDate, endDate, query } = input;
         
         console.log("startDate:", startDate, "endDate:", endDate, "query:", query);
 
-        //in start date minus 1 day and in end date add 1 day
-        const startDateMinus1Day = new Date(startDate);
-        startDateMinus1Day.setDate(startDateMinus1Day.getDate() - 0);
-        const endDatePlus1Day = new Date(endDate);
-        endDatePlus1Day.setDate(endDatePlus1Day.getDate() + 2);
-        startDate = startDateMinus1Day.toISOString().split('T')[0];
-        endDate = endDatePlus1Day.toISOString().split('T')[0];
-
+        if (startDate || endDate) {
+            //in start date minus 1 day and in end date add 1 day
+            const startDateMinus1Day = new Date(startDate);
+            startDateMinus1Day.setDate(startDateMinus1Day.getDate() - 0);
+            const endDatePlus1Day = new Date(endDate);
+            endDatePlus1Day.setDate(endDatePlus1Day.getDate() + 2);
+            startDate = startDateMinus1Day.toISOString().split('T')[0];
+            endDate = endDatePlus1Day.toISOString().split('T')[0];
+        }
         let emails = [];
         try {
             console.log("Listing emails for the user with maxResults:", maxResults, "startDate:", startDate, "endDate:", endDate, "query:", query);
             googleClient.setCredentials({
-                refresh_token: process.env.REFRESH_TOKEN
+                refresh_token: context.user.googleTokens.tokens.refresh_token
             })
             const gmail = google.gmail({ version: "v1", auth: googleClient });
             const response = await gmail.users.messages.list({
                 userId: "me",
-                q: query ? query : `after:${startDate} before:${endDate}`,
+                q: query ? query :  startDate && endDate ? `after:${startDate} before:${endDate}` : '',
                 maxResults: maxResults,
             });
             console.log("Response from listEmailsIds:", response.data.messages);
@@ -116,12 +117,12 @@ const sendEmail = tool({
         subject: z.string().describe("The subject of the email."),
         body: z.string().describe("The body of the email."),
     }),
-    execute: async (input) => {
+    execute: async (input, { experimental_context: context }) => {
         const { to, subject, body } = input;
         try {
             console.log("Sending email to:", to);
             googleClient.setCredentials({
-                refresh_token: process.env.REFRESH_TOKEN
+                refresh_token: context.user.googleTokens.tokens.refresh_token
             });
             
             const gmail = google.gmail({ version: "v1", auth: googleClient });
