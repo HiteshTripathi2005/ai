@@ -12,6 +12,12 @@ input:focus {
   border-color: inherit; /* or transparent */
 }
 
+textarea:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: inherit; /* or transparent */
+}
+
 
 ::-webkit-scrollbar-track {
   background: transparent;
