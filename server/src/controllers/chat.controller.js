@@ -74,7 +74,7 @@ export const chat = async (req, res) => {
         let selectedModel;
         switch (model) {
             case "gemini-2.0-flash-exp":
-                selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
+                selectedModel = openrouter.chat('anthropic/claude-haiku-4.5');
                 break;
             case "z-ai/glm-4.5-air:free":
                 selectedModel = openrouter.chat('z-ai/glm-4.5-air:free');
@@ -99,7 +99,7 @@ export const chat = async (req, res) => {
         const allTools = { ...tools, ...mcpTools };
 
         console.log("allTools names:", Object.keys(allTools));
-
+        console.log("selectedModel:", selectedModel);
         const result = await streamText({
             model: selectedModel,
             messages,
@@ -107,7 +107,6 @@ export const chat = async (req, res) => {
             tools: allTools,
             experimental_context: {user: user},
             onStepFinish: async (step) => {
-                console.log('Step finished:', 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
                 
                 // Add text part if there's text and it's not empty
                 if (step.text && step.text.trim()) {
@@ -120,7 +119,6 @@ export const chat = async (req, res) => {
                 // Add tool calls if present
                 if (step.toolCalls && step.toolCalls.length > 0) {
                     for (const toolCall of step.toolCalls) {
-                        console.log('Tool call object:', JSON.stringify(toolCall, null, 2));
                         assistantMessage.parts.push({
                             type: 'tool-call',
                             toolCallId: toolCall.toolCallId,
@@ -402,8 +400,6 @@ export const multiModelChat = async (req, res) => {
         const { prompt, chatId, models } = req.body;
         const userId = req.user._id;
 
-        console.log("Received multi-model prompt:", prompt, "Models:", models);
-
         if (!prompt) {
             return res.status(400).json({ error: "Prompt is required" });
         }
@@ -420,14 +416,12 @@ export const multiModelChat = async (req, res) => {
 
         if (!chat) {
             const chatTitle = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
-            console.log('Creating new chat with title:', chatTitle);
             chat = new Chat({
                 user: userId,
                 title: chatTitle,
                 messages: []
             });
             await chat.save();
-            console.log('New chat created with ID:', chat._id, 'and title:', chat.title);
         }
 
         // Add user message to chat
@@ -476,8 +470,7 @@ export const multiModelChat = async (req, res) => {
                     stopWhen: stepCountIs(10),
                     tools: allTools,
                     onStepFinish: async (step) => {
-                        console.log(`[${modelName}] Step finished:`, 'hasText:', !!step.text, 'hasToolCalls:', !!step.toolCalls?.length, 'hasToolResults:', !!step.toolResults?.length);
-
+                        
                         // Add text part first (matches single-model order)
                         if (step.text && step.text.trim()) {
                             modelResponse.parts.push({
@@ -489,7 +482,6 @@ export const multiModelChat = async (req, res) => {
                         // Add tool calls if present (after text, matches single-model order)
                         if (step.toolCalls && step.toolCalls.length > 0) {
                             for (const toolCall of step.toolCalls) {
-                                console.log(`[${modelName}] Tool call:`, toolCall.toolName);
                                 // Stream tool call start event
                                 res.write(`data: ${JSON.stringify({
                                     type: 'tool-input-available',
@@ -512,7 +504,6 @@ export const multiModelChat = async (req, res) => {
                         // Update tool results if present (matches single-model - updates existing tool calls)
                         if (step.toolResults && step.toolResults.length > 0) {
                             for (const toolResult of step.toolResults) {
-                                console.log(`[${modelName}] Tool result:`, toolResult.toolCallId);
                                 // Stream tool result event
                                 res.write(`data: ${JSON.stringify({
                                     type: 'tool-output-available',
