@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { useAuthStore } from './authStore';
+
+export const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
 export const useChatStore = create((set, get) => ({
   // Chat state
@@ -101,7 +102,7 @@ export const useChatStore = create((set, get) => ({
     let assistantMessage = null;
 
     try {
-      const response = await fetch('http://localhost:8080/api/chat', {
+      const response = await fetch(`${backendUrl}/api/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -709,7 +710,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     try {
-      const response = await fetch('http://localhost:8080/api/chat/multi-model', {
+      const response = await fetch(`${backendUrl}/api/chat/multi-model`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

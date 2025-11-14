@@ -371,7 +371,7 @@ const ProfilePage = () => {
                       <div>
                         <a
                           className="block text-center w-full p-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50"
-                          href={`http://localhost:8080/google/google-auth?userId=${user.id}`}
+                          href={`${import.meta.env.VITE_BACKEND_URL}/google/google-auth?userId=${user.id}`}
                           target="_blank"
                           rel="noreferrer noopener"
                         >
