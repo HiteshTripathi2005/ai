@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import { Copy, Check, ChevronDown } from "lucide-react";
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import Loading from './Loading';
-import ToolCallRenderer from './ToolCallRenderer';
-import MultiModelResponse from './MultiModelResponse';
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import Loading from "./Loading";
+import ToolCallRenderer from "./ToolCallRenderer";
+import MultiModelResponse from "./MultiModelResponse";
+import { cn } from "@/lib/utils";
 
 function MessageBubble({ msg, onSelectModel }) {
   const isUser = msg.role === "user";
@@ -12,16 +13,21 @@ function MessageBubble({ msg, onSelectModel }) {
 
   // Extract timestamp from message id
   const getTimestamp = () => {
-    const timestamp = parseInt(msg.id.replace('-ai', ''));
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timestamp = parseInt(msg.id.replace("-ai", ""));
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // Get all text content from message parts
   const getMessageText = () => {
-    return msg.parts
-      ?.filter(part => part.type === 'text')
-      ?.map(part => part.text)
-      ?.join(' ') || '';
+    return (
+      msg.parts
+        ?.filter((part) => part.type === "text")
+        ?.map((part) => part.text)
+        ?.join(" ") || ""
+    );
   };
 
   const handleCopy = async () => {
@@ -32,24 +38,45 @@ function MessageBubble({ msg, onSelectModel }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
-        console.error('Failed to copy text:', err);
+        console.error("Failed to copy text:", err);
       }
     }
   };
 
   const renderPart = (part, index) => {
-    if (part.type === 'text') {
+    if (part.type === "text") {
       return (
-        <div key={`part-${msg.id}-${index}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
-            <div className={`inline-block px-4 py-3 rounded-lg ${isUser ? "bg-zinc-100 dark:bg-zinc-800" : "bg-zinc-50 dark:bg-zinc-900"}`}>
-              <div className="markdown-content">
+        <div
+          key={`part-${msg.id}-${index}`}
+          className={`w-full flex mb-6 group ${
+            isUser ? "justify-end" : "justify-start"
+          }`}
+        >
+          <div
+            className={`max-w-[min(90%,800px)] ${isUser ? "ml-12" : "mr-12"}`}
+          >
+            <div
+              className={cn(
+                "px-4 py-3 rounded-2xl shadow-sm",
+                isUser
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted/50 border"
+              )}
+            >
+              <div className="markdown-content prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
-                    ul: ({children}) => <ul style={{listStyleType: 'disc'}}>{children}</ul>,
-                    ol: ({children}) => <ol style={{listStyleType: 'decimal'}}>{children}</ol>,
-                    li: ({children}) => <li>{children}</li>
+                    ul: ({ children }) => (
+                      <ul className="list-disc ml-4 my-2">{children}</ul>
+                    ),
+                    ol: ({ children }) => (
+                      <ol className="list-decimal ml-4 my-2">{children}</ol>
+                    ),
+                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                    p: ({ children }) => (
+                      <p className="mb-2 last:mb-0">{children}</p>
+                    ),
                   }}
                 >
                   {part.text}
@@ -57,23 +84,38 @@ function MessageBubble({ msg, onSelectModel }) {
               </div>
             </div>
             {/* Time and Copy Button */}
-            <div className={`flex items-center gap-2 mt-1 text-xs text-zinc-500 dark:text-zinc-400 ${isUser ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`flex items-center gap-3 mt-1.5 px-1 text-[10px] text-muted-foreground ${
+                isUser ? "justify-end" : "justify-start"
+              }`}
+            >
               <span>{getTimestamp()}</span>
               <button
                 onClick={handleCopy}
-                className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all"
                 title="Copy message"
               >
-                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                {copied ? (
+                  <Check className="h-3 w-3 text-green-500" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
               </button>
             </div>
           </div>
         </div>
       );
-    } else if (part.type === 'tool-call') {
+    } else if (part.type === "tool-call") {
       return (
-        <div key={`part-${msg.id}-${index}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
+        <div
+          key={`part-${msg.id}-${index}`}
+          className={`w-full flex mb-4 ${
+            isUser ? "justify-end" : "justify-start"
+          }`}
+        >
+          <div
+            className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}
+          >
             <ToolCallRenderer part={part} index={index} />
           </div>
         </div>
@@ -89,14 +131,16 @@ function MessageBubble({ msg, onSelectModel }) {
 
   const parts = msg.parts || [];
 
-  return (
-    <>
-      {parts.map((part, index) => renderPart(part, index))}
-    </>
-  );
+  return <>{parts.map((part, index) => renderPart(part, index))}</>;
 }
 
-export default function ChatArea({ messages, status, isAuthenticated, isLoadingMessages, onSelectModel }) {
+export default function ChatArea({
+  messages,
+  status,
+  isAuthenticated,
+  isLoadingMessages,
+  onSelectModel,
+}) {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const [isUserScrolledUp, setIsUserScrolledUp] = useState(false);
@@ -169,8 +213,7 @@ export default function ChatArea({ messages, status, isAuthenticated, isLoadingM
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
                 {isAuthenticated
                   ? "Start a conversation by typing a message below. I'm here to help with any questions you have!"
-                  : "Please login to start chatting with AI and get personalized assistance."
-                }
+                  : "Please login to start chatting with AI and get personalized assistance."}
               </p>
             </div>
           </div>
@@ -179,7 +222,13 @@ export default function ChatArea({ messages, status, isAuthenticated, isLoadingM
             <Loading />
           </div>
         ) : (
-          messages.map((msg) => <MessageBubble key={msg.id} msg={msg} onSelectModel={onSelectModel} />)
+          messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              msg={msg}
+              onSelectModel={onSelectModel}
+            />
+          ))
         )}
 
         {status === "streaming" && (

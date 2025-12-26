@@ -1,17 +1,38 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Menu, User, Plus, Settings, MessageCircle, Trash2, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import clsx from 'clsx';
-import { useAuthStore } from '../stores/authStore';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Plus,
+  MessageCircle,
+  Trash2,
+  LogOut,
+  User,
+  Settings,
+  X,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuthStore } from "../stores/authStore";
+import { Button } from "./ui/button";
+import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
-function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, currentChatId, chatHistory, isAuthenticated }) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [width, setWidth] = useState(280);
+function History({
+  open,
+  setOpen,
+  onNewChat,
+  onDeleteChat,
+  onSelectChat,
+  currentChatId,
+  chatHistory,
+  isAuthenticated,
+}) {
   const [isMobile, setIsMobile] = useState(false);
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
-  const isResizing = useRef(false);
-  const profileDropdownRef = useRef(null);
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
 
@@ -20,44 +41,9 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
       setIsMobile(window.innerWidth < 1024);
     };
     handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // Close profile dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
-        setIsProfileDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (isResizing.current && !isMobile) {
-        const newWidth = e.clientX;
-        if (newWidth > 60 && newWidth < 480) {
-          setWidth(newWidth);
-        }
-      }
-    };
-
-    const handleMouseUp = () => {
-      isResizing.current = false;
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isMobile]);
 
   const handleNewChat = () => {
     onNewChat();
@@ -67,326 +53,195 @@ function History({ open, setOpen, onNewChat, onDeleteChat, onSelectChat, current
   };
 
   const handleChatSelect = (chatId) => {
+    onSelectChat(chatId);
     navigate(`/chat/${chatId}`);
     if (isMobile) {
       setOpen(false);
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    setIsProfileDropdownOpen(false);
-  };
-
-  const handleProfileClick = () => {
-    setIsProfileDropdownOpen(!isProfileDropdownOpen);
-    setCollapsed(false);
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
   };
 
   const getInitials = (name) => {
-    return name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+    if (!name) return "U";
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
   };
 
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      <div className="p-4">
+        <Button
+          onClick={handleNewChat}
+          className="w-full justify-start gap-2 rounded-xl shadow-sm"
+          variant="default"
+          disabled={!isAuthenticated}
+        >
+          <Plus className="h-4 w-4" />
+          <span>New Chat</span>
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3 space-y-1">
+        {chatHistory.length > 0 ? (
+          chatHistory.map((chat) => (
+            <div
+              key={chat._id}
+              className={cn(
+                "group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all cursor-pointer",
+                currentChatId === chat._id
+                  ? "bg-secondary text-secondary-foreground font-medium shadow-sm"
+                  : "hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => handleChatSelect(chat._id)}
+            >
+              <MessageCircle
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  currentChatId === chat._id
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                )}
+              />
+              <span className="truncate flex-1">
+                {chat.title || "New Chat"}
+              </span>
+
+              {currentChatId === chat._id && (
+                <button
+                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded-md transition-all"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteChat(chat._id);
+                  }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ))
+        ) : (
+          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+            <MessageCircle className="h-8 w-8 mb-2 opacity-20" />
+            <p className="text-xs">No conversations yet</p>
+          </div>
+        )}
+      </div>
+
+      {isAuthenticated && (
+        <div className="p-4 border-t bg-muted/20">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-start gap-3 px-2 h-12 rounded-xl hover:bg-secondary"
+              >
+                {user?.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt=""
+                    className="h-8 w-8 rounded-full object-cover border"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold border border-primary/20">
+                    {getInitials(user?.name)}
+                  </div>
+                )}
+                <div className="flex flex-col items-start overflow-hidden">
+                  <span className="text-sm font-medium truncate w-full">
+                    {user?.name || "User"}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground truncate w-full">
+                    {user?.email}
+                  </span>
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/profile")}>
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/settings")}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <>
       {/* Desktop Sidebar */}
       {!isMobile && (
         <motion.div
-          animate={{ width: open ? (collapsed ? 60 : width) : 0 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="h-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 shadow-lg overflow-hidden flex flex-col border-r border-zinc-200 dark:border-zinc-800"
-        >
-          {open && (
-            <>
-              {/* Header - Fixed at top */}
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
-                  <h2 className={`text-lg font-semibold transition-all ${collapsed ? 'hidden' : 'block'}`}>Chat History</h2>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setCollapsed(!collapsed)}
-                      className="p-2 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                    >
-                      {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
-                  <button
-                    onClick={handleNewChat}
-                    disabled={!isAuthenticated}
-                    className={clsx(
-                      'w-full flex items-center gap-2 rounded-xl text-sm font-medium transition-colors',
-                      isAuthenticated
-                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90'
-                        : 'bg-zinc-200 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600',
-                      collapsed ? 'p-1' : 'p-2'
-                    )}
-                  >
-                    <Plus size={18} />
-                    {!collapsed && 'New Chat'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Chat List - Takes remaining space */}
-              <div className="flex-1 overflow-y-auto p-4">
-                {!collapsed && (
-                  <div className="space-y-2 h-full">
-                    {chatHistory && chatHistory.length > 0 ? (
-                      chatHistory.map((chat) => (
-                        <div
-                          key={chat._id || chat.id}
-                          onClick={() => handleChatSelect(chat._id || chat.id)}
-                          className={clsx(
-                            'group relative w-full rounded-xl border transition-all duration-200 p-3 cursor-pointer',
-                            (currentChatId === chat._id || currentChatId === chat.id)
-                              ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600'
-                              : 'border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-                          )}
-                        >
-                          <div
-                            className="w-full text-left flex items-center gap-3"
-                          >
-                            <MessageCircle size={16} className="text-zinc-400 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {chat.title || 'New Chat'}
-                              </p>
-                              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                                {new Date(chat.createdAt || Date.now()).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          {chatHistory.length > 1 && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteChat(chat._id || chat.id);
-                              }}
-                              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-zinc-400 hover:text-red-600 transition-all"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8">
-                        <MessageCircle className="h-8 w-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" />
-                        <p className="text-zinc-500 dark:text-zinc-400 text-xs">
-                          No chats yet
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Profile at Bottom - Fixed at bottom */}
-              <div className="flex-shrink-0 p-4 border-t border-zinc-200 dark:border-zinc-800">
-                <div className="relative" ref={profileDropdownRef}>
-                  <button
-                    onClick={handleProfileClick}
-                    className={clsx(
-                      'w-full flex items-center gap-2 p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors',
-                      collapsed ? 'justify-center' : 'justify-start'
-                    )}
-                  >
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.name || 'User'}
-                        className="h-6 w-6 rounded-full object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-medium text-zinc-600 dark:text-zinc-300 flex-shrink-0">
-                        {getInitials(user?.name)}
-                      </div>
-                    )}
-                    {!collapsed && (
-                      <div className="flex-1 text-left">
-                        <p className="text-sm font-medium truncate">{user?.name || 'Profile'}</p>
-                      </div>
-                    )}
-                  </button>
-
-                  {isProfileDropdownOpen && (
-                    <div className="absolute bottom-full left-0 mb-2 w-full bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-lg z-50">
-                      <div className="py-1">
-                        <button
-                          onClick={() => {
-                            navigate('/profile');
-                            setIsProfileDropdownOpen(false);
-                          }}
-                          className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                        >
-                          <User className="h-4 w-4 mr-3" />
-                          Go to Profile Page
-                        </button>
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                        >
-                          <LogOut className="h-4 w-4 mr-3" />
-                          Logout
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Resizer */}
-              {!collapsed && (
-                <div
-                  onMouseDown={() => (isResizing.current = true)}
-                  className="absolute top-0 right-0 h-full w-1 cursor-col-resize bg-zinc-300 dark:bg-zinc-600 hover:bg-zinc-400 dark:hover:bg-zinc-500"
-                />
-              )}
-            </>
+          initial={false}
+          animate={{
+            width: open ? 280 : 0,
+            opacity: open ? 1 : 0,
+          }}
+          className={cn(
+            "h-full bg-card text-card-foreground border-r overflow-hidden flex flex-col",
+            !open && "border-none"
           )}
-        </motion.div>
-      )}
-
-      {/* Mobile Bottom Dialog */}
-      {isMobile && open && (
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 p-4 rounded-t-2xl shadow-2xl z-50 max-h-[85vh] overflow-hidden"
         >
-          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-2">
-            <h2 className="text-lg font-semibold">Chat History</h2>
-          </div>
-          <div className="mt-4 space-y-2">
-            <button
-              onClick={handleNewChat}
-              disabled={!isAuthenticated}
-              className={clsx(
-                'w-full flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-medium transition-colors',
-                isAuthenticated
-                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 hover:opacity-90'
-                  : 'bg-zinc-200 text-zinc-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-600'
-              )}
-            >
-              <Plus size={18} />
-              New Chat
-            </button>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {chatHistory && chatHistory.length > 0 ? (
-                chatHistory.map((chat) => (
-                  <div
-                    key={chat._id || chat.id}
-                    className={clsx(
-                      'group relative w-full rounded-xl border transition-all duration-200 p-3',
-                      (currentChatId === chat._id || currentChatId === chat.id)
-                        ? 'bg-zinc-100 dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600'
-                        : 'border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-                    )}
-                  >
-                    <button
-                      onClick={() => handleChatSelect(chat._id || chat.id)}
-                      className="w-full text-left flex items-center gap-3"
-                    >
-                      <MessageCircle size={16} className="text-zinc-400 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {chat.title || 'New Chat'}
-                        </p>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                          {new Date(chat.createdAt || Date.now()).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </button>
-                    {chatHistory.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteChat(chat._id || chat.id);
-                        }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-900/20 text-zinc-400 hover:text-red-600 transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <MessageCircle className="h-8 w-8 text-zinc-300 dark:text-zinc-600 mx-auto mb-2" />
-                  <p className="text-zinc-500 dark:text-zinc-400 text-xs">
-                    No chats yet. Start a new conversation!
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Profile at Bottom in Mobile */}
-          <div className="mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-800">
-            <div className="relative" ref={profileDropdownRef}>
-              <button
-                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                className="w-full flex items-center gap-2 p-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                {user?.avatar ? (
-                  <img
-                    src={user.avatar}
-                    alt={user.name || 'User'}
-                    className="h-6 w-6 rounded-full object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <div className="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-xs font-medium text-zinc-600 dark:text-zinc-300 flex-shrink-0">
-                    {getInitials(user?.name)}
-                  </div>
-                )}
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium truncate">{user?.name || 'Profile'}</p>
-                </div>
-              </button>
-
-              {isProfileDropdownOpen && (
-                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-lg z-50">
-                  <div className="py-1">
-                    <button
-                      onClick={() => {
-                        navigate('/profile');
-                        setIsProfileDropdownOpen(false);
-                        setOpen(false); // Close mobile sidebar
-                      }}
-                      className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    >
-                      <User className="h-4 w-4 mr-3" />
-                      Go to Profile Page
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleLogout();
-                        setOpen(false); // Close mobile sidebar
-                      }}
-                      className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800"
-                    >
-                      <LogOut className="h-4 w-4 mr-3" />
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <SidebarContent />
         </motion.div>
       )}
 
-      {/* Backdrop for mobile */}
-      {isMobile && open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-30"
-          onClick={() => setOpen(false)}
-        />
-      )}
+      {/* Mobile Sidebar (Drawer) */}
+      <AnimatePresence>
+        {isMobile && open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40"
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="fixed inset-y-0 left-0 w-[280px] bg-card border-r z-50 shadow-2xl"
+            >
+              <div className="flex items-center justify-between p-4 border-b">
+                <span className="font-semibold">History</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <SidebarContent />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </>
   );
 }

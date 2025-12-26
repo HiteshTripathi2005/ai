@@ -1,6 +1,6 @@
-import React from 'react';
-import { Menu } from 'lucide-react';
-import History from './History';
+import React from "react";
+import { Menu } from "lucide-react";
+import History from "./History";
 
 const SidebarLayout = ({
   children,
@@ -11,7 +11,7 @@ const SidebarLayout = ({
   onSelectChat,
   currentChatId,
   chatHistory,
-  isAuthenticated
+  isAuthenticated,
 }) => {
   return (
     <div className="h-screen w-full bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex">
@@ -28,15 +28,7 @@ const SidebarLayout = ({
       />
 
       {/* Main Content Area */}
-      <main className="flex flex-col flex-1 relative h-full transition-all duration-300">
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute top-4 left-4 z-10 p-2 rounded bg-zinc-900 text-white hover:bg-zinc-700 shadow"
-          >
-            <Menu size={20} />
-          </button>
-        )}
+      <main className="flex flex-col flex-1 relative h-full transition-all duration-300 overflow-hidden">
         {children}
       </main>
     </div>
