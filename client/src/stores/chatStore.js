@@ -38,7 +38,7 @@ export const useChatStore = create((set, get) => ({
   setStreamingChatId: (streamingChatId) => set({ streamingChatId }),
 
   // Chat functions
-  sendMessage: async (prompt, chatId, model = "gemini-2.0-flash-exp") => {
+  sendMessage: async (prompt, chatId, model = "gemini-2.0-flash-exp", imageUrls = null) => {
     if (!prompt.trim()) return;
 
     const { messages, setMessages, setStatus, setError, chatHistory, setChatHistory, currentChatId, fetchChats, setCurrentChatId, setStreamingChatId } = get();
@@ -46,8 +46,21 @@ export const useChatStore = create((set, get) => ({
     const userMsg = {
       id: Date.now() + "",
       role: "user",
-      parts: [{ type: "text", text: prompt }]
+      parts: []
     };
+
+    // Add images first if provided
+    if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+      imageUrls.forEach(imageUrl => {
+        userMsg.parts.push({
+          type: "image",
+          image: imageUrl
+        });
+      });
+    }
+
+    // Add text after images
+    userMsg.parts.push({ type: "text", text: prompt });
 
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -112,7 +125,8 @@ export const useChatStore = create((set, get) => ({
         body: JSON.stringify({
           prompt,
           chatId: currentChatId === "default-chat" ? null : currentChatId,
-          model
+          model,
+          ...(imageUrls && imageUrls.length > 0 && { imageUrls })
         })
       });
 
@@ -670,7 +684,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   // Multi-model send message
-  sendMultiModelMessage: async (prompt, models) => {
+  sendMultiModelMessage: async (prompt, models, imageUrls = null) => {
     if (!prompt.trim() || !models || models.length === 0) return;
 
     const { messages, setMessages, setStatus, setError, chatHistory, setChatHistory, currentChatId, setStreamingChatId } = get();
@@ -678,8 +692,21 @@ export const useChatStore = create((set, get) => ({
     const userMsg = {
       id: Date.now() + "",
       role: "user",
-      parts: [{ type: "text", text: prompt }]
+      parts: []
     };
+
+    // Add images first if provided
+    if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+      imageUrls.forEach(imageUrl => {
+        userMsg.parts.push({
+          type: "image",
+          image: imageUrl
+        });
+      });
+    }
+
+    // Add text after images
+    userMsg.parts.push({ type: "text", text: prompt });
 
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
@@ -719,7 +746,8 @@ export const useChatStore = create((set, get) => ({
         body: JSON.stringify({
           prompt,
           chatId: currentChatId === "default-chat" ? null : currentChatId,
-          models
+          models,
+          ...(imageUrls && imageUrls.length > 0 && { imageUrls })
         })
       });
 

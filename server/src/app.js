@@ -4,6 +4,7 @@ import connectDB from "./config/database.js";
 import chatRouter from "./routes/chat.js";
 import authRouter from "./routes/auth.js";
 import taskRouter from "./routes/task.js";
+import uploadRouter from "./routes/upload.js";
 import cookie_parser from "cookie-parser";
 import {google} from 'googleapis'
 import googleAuthRouter from "./routes/google-auth.js";
@@ -34,6 +35,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/chat", chatRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/tasks", taskRouter);
+app.use("/api/upload", uploadRouter);
 app.use("/google", googleAuthRouter);
 // Health check
 app.get("/api/health", (req, res) => {

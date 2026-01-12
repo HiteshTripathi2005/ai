@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema({
       type: Object,
       default: null
     }
+  },
+  systemPrompt: {
+    type: String,
+    default: 'You are an AI assistant that evaluates multiple responses and selects the best one based on accuracy, clarity, and helpfulness.',
+    maxlength: [500, 'System prompt cannot exceed 500 characters']
   }
 }, {
   timestamps: true

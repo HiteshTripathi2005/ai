@@ -26,11 +26,12 @@ const tools = {
 
 export const chat = async (req, res) => {
     try {
-        const { prompt, chatId, model } = req.body;
+        const { prompt, chatId, model, imageUrls } = req.body;
         const userId = req.user._id;
         const user = req.user;
 
         console.log("Received prompt:", prompt);
+        console.log("Received imageUrls:", imageUrls);
 
         if (!prompt) {
             return res.status(400).json({ error: "Prompt is required" });
@@ -58,8 +59,22 @@ export const chat = async (req, res) => {
         const userMessage = {
             id: Date.now().toString(),
             role: 'user',
-            parts: [{ type: 'text', text: prompt }]
+            parts: []
         };
+
+        // Add images first if provided
+        if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+            imageUrls.forEach(imageUrl => {
+                userMessage.parts.push({
+                    type: 'image',
+                    image: imageUrl
+                });
+            });
+        }
+
+        // Add text after images
+        userMessage.parts.push({ type: 'text', text: prompt });
+
         chat.messages.push(userMessage);
         await chat.save();
 
@@ -397,7 +412,7 @@ const getModelInstance = (modelName) => {
 // Multi-model chat - get responses from multiple models
 export const multiModelChat = async (req, res) => {
     try {
-        const { prompt, chatId, models } = req.body;
+        const { prompt, chatId, models, imageUrls } = req.body;
         const userId = req.user._id;
 
         if (!prompt) {
@@ -428,8 +443,22 @@ export const multiModelChat = async (req, res) => {
         const userMessage = {
             id: Date.now().toString(),
             role: 'user',
-            parts: [{ type: 'text', text: prompt }]
+            parts: []
         };
+
+        // Add images first if provided
+        if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+            imageUrls.forEach(imageUrl => {
+                userMessage.parts.push({
+                    type: 'image',
+                    image: imageUrl
+                });
+            });
+        }
+
+        // Add text after images
+        userMessage.parts.push({ type: 'text', text: prompt });
+
         chat.messages.push(userMessage);
         await chat.save();
 
@@ -717,10 +746,27 @@ const buildMessagesArray = async (chat, currentPrompt, userId) => {
         }
     }
 
-    // Add current user prompt
+    // Add current user prompt (including images if present)
+    const currentMessageContent = [];
+
+    // Check if the last message has images and add them first
+    const lastUserMessage = chat.messages[chat.messages.length - 1];
+    if (lastUserMessage && lastUserMessage.role === 'user') {
+        const imageParts = lastUserMessage.parts.filter(p => p.type === 'image');
+        imageParts.forEach(imagePart => {
+            currentMessageContent.push({
+                type: 'image',
+                image: imagePart.image
+            });
+        });
+    }
+
+    // Add text after images
+    currentMessageContent.push({ type: 'text', text: currentPrompt });
+
     messages.push({
         role: 'user',
-        content: currentPrompt
+        content: currentMessageContent
     });
 
     return messages;

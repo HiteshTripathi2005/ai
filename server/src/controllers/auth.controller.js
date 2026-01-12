@@ -78,7 +78,7 @@ export const Login = async (req, res) => {
 export const GetMe = async (req, res) => {
     try {
     const user = await User.findById(req.user._id);
-    
+
     res.json({
       success: true,
       data: {
@@ -88,7 +88,8 @@ export const GetMe = async (req, res) => {
           email: user.email,
           role: user.role,
           createdAt: user.createdAt,
-          googleTokens: user.googleTokens
+          googleTokens: user.googleTokens,
+          systemPrompt: user.systemPrompt
         }
       }
     });
@@ -189,11 +190,12 @@ export const Register = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
     try {
-    const { name, email } = req.body;
+    const { name, email, systemPrompt } = req.body;
     const updateData = {};
 
     if (name) updateData.name = name;
     if (email) updateData.email = email.toLowerCase();
+    if (systemPrompt !== undefined) updateData.systemPrompt = systemPrompt;
 
     // Check if email is already taken by another user
     if (email) {
@@ -226,7 +228,8 @@ export const updateProfile = async (req, res) => {
           email: user.email,
           role: user.role,
           createdAt: user.createdAt,
-          googleTokens: user.googleTokens
+          googleTokens: user.googleTokens,
+          systemPrompt: user.systemPrompt
         }
       }
     });

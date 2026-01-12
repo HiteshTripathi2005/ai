@@ -37,51 +37,6 @@ function MessageBubble({ msg, onSelectModel }) {
     }
   };
 
-  const renderPart = (part, index) => {
-    if (part.type === 'text') {
-      return (
-        <div key={`part-${msg.id}-${index}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
-            <div className={`inline-block px-4 py-3 rounded-lg ${isUser ? "bg-zinc-100 dark:bg-zinc-800" : "bg-zinc-50 dark:bg-zinc-900"}`}>
-              <div className="markdown-content">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    ul: ({children}) => <ul style={{listStyleType: 'disc'}}>{children}</ul>,
-                    ol: ({children}) => <ol style={{listStyleType: 'decimal'}}>{children}</ol>,
-                    li: ({children}) => <li>{children}</li>
-                  }}
-                >
-                  {part.text}
-                </ReactMarkdown>
-              </div>
-            </div>
-            {/* Time and Copy Button */}
-            <div className={`flex items-center gap-2 mt-1 text-xs text-zinc-500 dark:text-zinc-400 ${isUser ? "justify-end" : "justify-start"}`}>
-              <span>{getTimestamp()}</span>
-              <button
-                onClick={handleCopy}
-                className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                title="Copy message"
-              >
-                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    } else if (part.type === 'tool-call') {
-      return (
-        <div key={`part-${msg.id}-${index}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
-          <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
-            <ToolCallRenderer part={part} index={index} />
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
-
   // Check if this is a multi-model message
   if (msg.isMultiModel && msg.multiModelResponses) {
     return <MultiModelResponse msg={msg} onSelectModel={onSelectModel} />;
@@ -89,10 +44,93 @@ function MessageBubble({ msg, onSelectModel }) {
 
   const parts = msg.parts || [];
 
+  // Separate images, text, and tool calls
+  const images = parts.filter(p => p.type === 'image');
+  const textParts = parts.filter(p => p.type === 'text');
+  const toolCalls = parts.filter(p => p.type === 'tool-call');
+
+  // If only tool calls, render them separately
+  if (toolCalls.length > 0 && images.length === 0 && textParts.length === 0) {
+    return (
+      <>
+        {toolCalls.map((part, index) => (
+          <div key={`part-${msg.id}-${index}`} className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
+            <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
+              <ToolCallRenderer part={part} index={index} />
+            </div>
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  // Combine images and text into one message bubble
   return (
-    <>
-      {parts.map((part, index) => renderPart(part, index))}
-    </>
+    <div className={`w-full flex mb-4 ${isUser ? "justify-end" : "justify-start"}`}>
+      <div className={`max-w-[min(85%,700px)] ${isUser ? "ml-12" : "mr-12"}`}>
+        <div className="inline-block">
+          {/* Images at the top */}
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {images.map((img, imgIndex) => (
+                <div key={`img-${imgIndex}`} className="inline-block rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700">
+                  <img
+                    src={img.image}
+                    alt={`Uploaded image ${imgIndex + 1}`}
+                    className="max-w-full h-auto rounded-lg"
+                    style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'cover' }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Text below images */}
+          {textParts.length > 0 && (
+            <div className={`px-4 py-3 rounded-lg ${isUser ? "bg-zinc-100 dark:bg-zinc-800" : "bg-zinc-50 dark:bg-zinc-900"}`}>
+              <div className="markdown-content">
+                {textParts.map((part, index) => (
+                  <ReactMarkdown
+                    key={`text-${index}`}
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      ul: ({children}) => <ul style={{listStyleType: 'disc'}}>{children}</ul>,
+                      ol: ({children}) => <ol style={{listStyleType: 'decimal'}}>{children}</ol>,
+                      li: ({children}) => <li>{children}</li>
+                    }}
+                  >
+                    {part.text}
+                  </ReactMarkdown>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Time and Copy Button */}
+        <div className={`flex items-center gap-2 mt-1 text-xs text-zinc-500 dark:text-zinc-400 ${isUser ? "justify-end" : "justify-start"}`}>
+          <span>{getTimestamp()}</span>
+          {textParts.length > 0 && (
+            <button
+              onClick={handleCopy}
+              className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+              title="Copy message"
+            >
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+            </button>
+          )}
+        </div>
+
+        {/* Tool calls below */}
+        {toolCalls.length > 0 && (
+          <div className="mt-2">
+            {toolCalls.map((part, index) => (
+              <ToolCallRenderer key={`tool-${index}`} part={part} index={index} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

@@ -106,7 +106,7 @@ export const useAuthStore = create((set, get) => ({
   },
 
   // Update profile function
-  updateProfile: async (name, email) => {
+  updateProfile: async (name, email, systemPrompt) => {
     const { setLoading, setError, setUser } = get();
 
     setLoading(true);
@@ -116,6 +116,7 @@ export const useAuthStore = create((set, get) => ({
       const response = await api.put('/auth/profile', {
         name,
         email,
+        systemPrompt,
       });
 
       const { user } = response.data.data;

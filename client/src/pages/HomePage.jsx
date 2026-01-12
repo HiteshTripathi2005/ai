@@ -117,29 +117,29 @@ const HomePage = () => {
       </div>
       {/* Fixed Composer */}
       <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950">
-        <Composer 
-          onSend={isAuthenticated ? async ({ message, model }) => {
+        <Composer
+          onSend={isAuthenticated ? async ({ message, model, imageUrls }) => {
             if (location.pathname === '/' || currentChatId === "default-chat") {
               const result = await handleNewChat(navigate);
               if (result && result.success) {
-                sendMessage(message, undefined, model);
+                sendMessage(message, undefined, model, imageUrls);
               }
             } else {
-              sendMessage(message, undefined, model);
+              sendMessage(message, undefined, model, imageUrls);
             }
           } : () => toast.error('Please login to send messages')}
-          onMultiModelSend={isAuthenticated ? async ({ message, models }) => {
+          onMultiModelSend={isAuthenticated ? async ({ message, models, imageUrls }) => {
             if (location.pathname === '/' || currentChatId === "default-chat") {
               const result = await handleNewChat(navigate);
               if (result && result.success) {
-                sendMultiModelMessage(message, models);
+                sendMultiModelMessage(message, models, imageUrls);
               }
             } else {
-              sendMultiModelMessage(message, models);
+              sendMultiModelMessage(message, models, imageUrls);
             }
           } : () => toast.error('Please login to send messages')}
-          isStreaming={isStreaming} 
-          width={sidebarW} 
+          isStreaming={isStreaming}
+          width={sidebarW}
           disabled={!isAuthenticated}
         />
       </div>

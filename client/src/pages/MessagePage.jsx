@@ -95,12 +95,12 @@ const MessagePage = () => {
     }
   };
 
-  const handleSendMessage = async ({ message, model }) => {
+  const handleSendMessage = async ({ message, model, imageUrls }) => {
     if (!isAuthenticated) {
       toast.error('Please login to send messages');
       return;
     }
-    await sendMessage(message, chatId, model);
+    await sendMessage(message, chatId, model, imageUrls);
   };
 
   const handleBackToHome = () => {

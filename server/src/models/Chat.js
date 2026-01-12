@@ -14,12 +14,16 @@ const messageSchema = new mongoose.Schema({
   parts: [{
     type: {
       type: String,
-      enum: ['text', 'tool-call'],
+      enum: ['text', 'tool-call', 'image'],
       required: true
     },
     text: {
       type: String,
       required: function() { return this.type === 'text'; }
+    },
+    image: {
+      type: String,
+      required: function() { return this.type === 'image'; }
     },
     toolCallId: {
       type: String,
@@ -46,10 +50,11 @@ const messageSchema = new mongoose.Schema({
     parts: [{
       type: {
         type: String,
-        enum: ['text', 'tool-call'],
+        enum: ['text', 'tool-call', 'image'],
         required: true
       },
       text: String,
+      image: String,
       toolCallId: String,
       toolName: String,
       args: mongoose.Schema.Types.Mixed,

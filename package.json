@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\""
+    "dev": "concurrently \"cd server && npm run dev\" \"cd client && npm run dev\"",
+    "i:all": "cd server && bun install && cd ../client && bun install"
   },
   "keywords": [],
   "author": "",
