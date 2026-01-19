@@ -1,5 +1,6 @@
 import {createOpenRouter} from "@openrouter/ai-sdk-provider"
-import { smoothStream, stepCountIs, streamText } from 'ai';
+import { smoothStream, stepCountIs, streamText, generateObject } from 'ai';
+import { z } from 'zod';
 import { systemPrompt } from '../utils/systemPrompt.js';
 import Chat from '../models/Chat.js';
 import { taskTool, timeTool } from "../utils/tools.js";
@@ -770,4 +771,214 @@ const buildMessagesArray = async (chat, currentPrompt, userId) => {
     });
 
     return messages;
+};
+
+// Comparison chat - get responses from 3 models and let AI choose the best
+export const comparisonChat = async (req, res) => {
+    try {
+        const { prompt, chatId, imageUrls } = req.body;
+        const userId = req.user._id;
+        const user = req.user;
+
+        console.log("Comparison chat - Received prompt:", prompt);
+        console.log("User system prompt:", user.systemPrompt);
+
+        if (!prompt) {
+            return res.status(400).json({ error: "Prompt is required" });
+        }
+
+        // Find or create chat
+        let chat = null;
+        if (chatId) {
+            chat = await Chat.findOne({ _id: chatId, user: userId });
+        }
+
+        if (!chat) {
+            const chatTitle = prompt.substring(0, 50) + (prompt.length > 50 ? '...' : '');
+            chat = new Chat({
+                user: userId,
+                title: chatTitle,
+                messages: []
+            });
+            await chat.save();
+        }
+
+        // Add user message to chat
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            parts: []
+        };
+
+        // Add images first if provided
+        if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+            imageUrls.forEach(imageUrl => {
+                userMessage.parts.push({
+                    type: 'image',
+                    image: imageUrl
+                });
+            });
+        }
+
+        // Add text after images
+        userMessage.parts.push({ type: 'text', text: prompt });
+
+        chat.messages.push(userMessage);
+        await chat.save();
+
+        // Define 3 models to compare
+        const modelsToCompare = [
+            { name: 'gemini-2.0-flash-exp', id: 'google/gemini-2.0-flash-001' },
+            { name: 'claude-3.5-sonnet', id: 'anthropic/claude-3.5-sonnet' },
+            { name: 'gpt-4o-mini', id: 'openai/gpt-4o-mini' }
+        ];
+
+        // Prepare message content for models
+        const messageContent = [];
+        if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+            imageUrls.forEach(imageUrl => {
+                messageContent.push({
+                    type: 'image',
+                    image: imageUrl
+                });
+            });
+        }
+        messageContent.push({ type: 'text', text: prompt });
+
+        console.log('Fetching responses from 3 models in parallel...');
+
+        // Get responses from all 3 models in parallel
+        const modelResponses = await Promise.allSettled(
+            modelsToCompare.map(async (model) => {
+                try {
+                    const modelInstance = openrouter.chat(model.id);
+                    const result = await streamText({
+                        model: modelInstance,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: messageContent
+                            }
+                        ],
+                        maxTokens: 2000,
+                    });
+
+                    const fullText = await result.text;
+                    return {
+                        modelName: model.name,
+                        response: fullText,
+                        success: true
+                    };
+                } catch (error) {
+                    console.error(`Error with model ${model.name}:`, error);
+                    return {
+                        modelName: model.name,
+                        response: `Error: ${error.message}`,
+                        success: false
+                    };
+                }
+            })
+        );
+
+        // Extract successful responses
+        const responses = modelResponses.map((result, index) => {
+            if (result.status === 'fulfilled') {
+                return result.value;
+            } else {
+                return {
+                    modelName: modelsToCompare[index].name,
+                    response: 'Failed to get response',
+                    success: false
+                };
+            }
+        });
+
+        console.log('Received responses from all models');
+
+        // Prepare evaluation prompt for Gemini
+        const evaluationPrompt = `${user.systemPrompt}
+
+Here are three AI responses to the user's question: "${prompt}"
+
+Response 1 (${responses[0].modelName}):
+${responses[0].response}
+
+Response 2 (${responses[1].modelName}):
+${responses[1].response}
+
+Response 3 (${responses[2].modelName}):
+${responses[2].response}
+
+Based on your evaluation criteria, analyze these responses and select which one is the best. Return the option number (1, 2, or 3) and a brief explanation of why you chose it.`;
+
+        // Define schema for structured output
+        const evaluationSchema = z.object({
+            selectedOption: z.number().min(1).max(3).describe('The number of the selected response (1, 2, or 3)'),
+            reasoning: z.string().describe('Brief explanation of why this response was selected as the best')
+        });
+
+        // Get Gemini to evaluate and return structured decision
+        console.log('Asking Gemini to evaluate and select best response...');
+        const evaluatorModel = openrouter.chat('google/gemini-2.0-flash-001');
+
+        const result = await generateObject({
+            model: evaluatorModel,
+            schema: evaluationSchema,
+            prompt: evaluationPrompt,
+        });
+
+        const { selectedOption, reasoning } = result.object;
+        console.log(`Gemini selected option ${selectedOption}: ${reasoning}`);
+
+        // Get the winning response
+        const winningResponse = responses[selectedOption - 1];
+        console.log(`Sending response from ${winningResponse.modelName}`);
+
+        // Prepare assistant message with the winning response
+        const assistantMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            parts: [{
+                type: 'text',
+                text: winningResponse.response
+            }],
+            metadata: {
+                selectedModel: winningResponse.modelName,
+                reasoning: reasoning,
+                comparedModels: responses.map(r => r.modelName)
+            }
+        };
+
+        // Save assistant message to chat
+        chat.messages.push(assistantMessage);
+        await chat.save();
+
+        console.log('Comparison chat completed and saved');
+
+        // Send complete response with metadata
+        res.status(200).json({
+            success: true,
+            data: {
+                chatId: chat._id,
+                message: assistantMessage,
+                comparisonResult: {
+                    selectedModel: winningResponse.modelName,
+                    reasoning: reasoning,
+                    allModels: responses.map(r => ({
+                        name: r.modelName,
+                        wasSelected: r.modelName === winningResponse.modelName
+                    }))
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error("Error in comparison chat:", error);
+
+        res.status(500).json({
+            success: false,
+            message: "Failed to process comparison chat",
+            error: error.message
+        });
+    }
 };

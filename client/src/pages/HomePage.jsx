@@ -20,12 +20,13 @@ const HomePage = () => {
     isLoadingMessages,
     sendMessage,
     sendMultiModelMessage,
+    sendComparisonMessage,
     selectModelResponse,
     handleNewChat,
     deleteChat,
     selectChat,
     fetchChats,
-    setSidebarOpen, 
+    setSidebarOpen,
     setSidebarW,
     toggleSidebar
   } = useChatStore();
@@ -105,18 +106,19 @@ const HomePage = () => {
       chatHistory={chatHistory}
       isAuthenticated={isAuthenticated}
     >
-      {/* Scrollable ChatArea */}
-      <div className="flex-1 flex-col-reverse overflow-y-auto">
-        <ChatArea 
-          messages={messages} 
-          status={computedStatus} 
-          isAuthenticated={isAuthenticated} 
-          isLoadingMessages={isLoadingMessages}
-          onSelectModel={selectModelResponse}
-        />
-      </div>
-      {/* Fixed Composer */}
-      <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Scrollable ChatArea */}
+        <div className="flex-1 overflow-hidden">
+          <ChatArea
+            messages={messages}
+            status={computedStatus}
+            isAuthenticated={isAuthenticated}
+            isLoadingMessages={isLoadingMessages}
+            onSelectModel={selectModelResponse}
+          />
+        </div>
+        {/* Fixed Composer */}
+        <div className="flex-shrink-0 bg-white dark:bg-zinc-950">
         <Composer
           onSend={isAuthenticated ? async ({ message, model, imageUrls }) => {
             if (location.pathname === '/' || currentChatId === "default-chat") {
@@ -138,10 +140,21 @@ const HomePage = () => {
               sendMultiModelMessage(message, models, imageUrls);
             }
           } : () => toast.error('Please login to send messages')}
+          onComparisonSend={isAuthenticated ? async ({ message, imageUrls }) => {
+            if (location.pathname === '/' || currentChatId === "default-chat") {
+              const result = await handleNewChat(navigate);
+              if (result && result.success) {
+                sendComparisonMessage(message, imageUrls);
+              }
+            } else {
+              sendComparisonMessage(message, imageUrls);
+            }
+          } : () => toast.error('Please login to send messages')}
           isStreaming={isStreaming}
           width={sidebarW}
           disabled={!isAuthenticated}
         />
+        </div>
       </div>
     </SidebarLayout>
   )

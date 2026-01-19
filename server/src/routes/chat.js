@@ -7,7 +7,8 @@ import {
     deleteChat,
     updateChatTitle,
     multiModelChat,
-    selectModelResponse
+    selectModelResponse,
+    comparisonChat
 } from "../controllers/chat.controller.js";
 import { protect } from "../middleware/auth.js";
 
@@ -16,6 +17,7 @@ const router = Router();
 // Chat message routes
 router.route("/").post(protect, chat);
 router.route("/multi-model").post(protect, multiModelChat);
+router.route("/comparison").post(protect, comparisonChat);
 router.route("/select-response").post(protect, selectModelResponse);
 
 // Chat management routes

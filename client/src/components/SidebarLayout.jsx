@@ -28,7 +28,7 @@ const SidebarLayout = ({
       />
 
       {/* Main Content Area */}
-      <main className="flex flex-col flex-1 relative h-full transition-all duration-300">
+      <main className="flex flex-col flex-1 relative h-screen transition-all duration-300 overflow-hidden">
         {!sidebarOpen && (
           <button
             onClick={() => setSidebarOpen(true)}

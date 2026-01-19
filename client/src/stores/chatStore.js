@@ -683,6 +683,89 @@ export const useChatStore = create((set, get) => ({
     setSidebarOpen(!sidebarOpen);
   },
 
+  // Comparison send message - sends to 3 models and gets AI to choose best (non-streaming)
+  sendComparisonMessage: async (prompt, imageUrls = null) => {
+    if (!prompt.trim()) return;
+
+    const { messages, setMessages, setStatus, setError, currentChatId, fetchChats, setCurrentChatId } = get();
+
+    const userMsg = {
+      id: Date.now() + "",
+      role: "user",
+      parts: []
+    };
+
+    // Add images first if provided
+    if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
+      imageUrls.forEach(imageUrl => {
+        userMsg.parts.push({
+          type: "image",
+          image: imageUrl
+        });
+      });
+    }
+
+    // Add text after images
+    userMsg.parts.push({ type: "text", text: prompt });
+
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
+    setStatus("streaming");
+
+    try {
+      const response = await fetch(`${backendUrl}/api/chat/comparison`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          prompt,
+          chatId: currentChatId === "default-chat" ? null : currentChatId,
+          ...(imageUrls && imageUrls.length > 0 && { imageUrls })
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Add comparison metadata to the message
+        const messageWithComparison = {
+          ...data.data.message,
+          comparisonResult: data.data.comparisonResult
+        };
+
+        // Add the complete AI message with comparison metadata
+        const finalMessages = [...updatedMessages, messageWithComparison];
+        setMessages(finalMessages);
+
+        // Update chat ID if it was created
+        if (data.data.chatId && currentChatId === "default-chat") {
+          setCurrentChatId(data.data.chatId);
+        }
+
+        setStatus("ready");
+        await fetchChats();
+
+        // Show notification about which model was selected
+        if (data.data.comparisonResult) {
+          console.log(`✨ Selected: ${data.data.comparisonResult.selectedModel}`);
+          console.log(`📝 Reasoning: ${data.data.comparisonResult.reasoning}`);
+        }
+      } else {
+        throw new Error(data.message || 'Failed to get comparison response');
+      }
+    } catch (error) {
+      console.error('Comparison chat error:', error);
+      setError(error.message);
+      setStatus("error");
+    }
+  },
+
   // Multi-model send message
   sendMultiModelMessage: async (prompt, models, imageUrls = null) => {
     if (!prompt.trim() || !models || models.length === 0) return;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Copy, Check, ChevronDown } from "lucide-react";
+import { Copy, Check, ChevronDown, Sparkles, Award } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Loading from './Loading';
@@ -82,6 +82,19 @@ function MessageBubble({ msg, onSelectModel }) {
                   />
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Comparison Result Badge */}
+          {msg.comparisonResult && !isUser && (
+            <div className="mb-2 inline-flex items-center gap-2 px-3 py-1.5 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs">
+              <Award className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+              <span className="font-medium text-purple-700 dark:text-purple-300">
+                Best Response: {msg.comparisonResult.selectedModel}
+              </span>
+              <span className="text-purple-600 dark:text-purple-400 border-l border-purple-300 dark:border-purple-700 pl-2">
+                {msg.comparisonResult.reasoning}
+              </span>
             </div>
           )}
 
@@ -192,11 +205,12 @@ export default function ChatArea({ messages, status, isAuthenticated, isLoadingM
   }, [isUserScrolledUp]);
 
   return (
-    <main className="flex-1 flex flex-col relative">
+    <main className="flex flex-col h-full w-full">
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-auto px-2 md:px-6 py-4 md:py-6 space-y-3 overscroll-contain"
+        className="h-full overflow-y-auto overflow-x-hidden px-2 md:px-6 py-4 md:py-6 space-y-3"
         id="messages-root"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {messages.length === 0 && !isLoadingMessages ? (
           <div className="flex-1 h-[calc(100vh-200px)] flex items-center justify-center">
@@ -232,21 +246,6 @@ export default function ChatArea({ messages, status, isAuthenticated, isLoadingM
 
         <div ref={messagesEndRef} />
       </div>
-
-      {/* “Scroll to latest” button (shows only when user scrolled up) */}
-      {isUserScrolledUp && (
-        <button
-          onClick={() => {
-            scrollToBottom(true);
-            setIsUserScrolledUp(false);
-          }}
-          className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 px-3 py-2 text-sm shadow-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          title="Scroll to latest"
-        >
-          <ChevronDown className="h-4 w-4" />
-          Latest
-        </button>
-      )}
     </main>
   );
 }

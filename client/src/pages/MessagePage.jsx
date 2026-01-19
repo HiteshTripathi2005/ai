@@ -23,6 +23,7 @@ const MessagePage = () => {
     status,
     isLoadingMessages,
     sendMessage,
+    sendComparisonMessage,
     selectChat,
     fetchChats,
     setCurrentChatId,
@@ -103,6 +104,14 @@ const MessagePage = () => {
     await sendMessage(message, chatId, model, imageUrls);
   };
 
+  const handleComparisonSend = async ({ message, imageUrls }) => {
+    if (!isAuthenticated) {
+      toast.error('Please login to send messages');
+      return;
+    }
+    await sendComparisonMessage(message, imageUrls);
+  };
+
   const handleBackToHome = () => {
     navigate('/');
   };
@@ -162,9 +171,10 @@ const MessagePage = () => {
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
+      {/* Main Content Wrapper */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Chat Area */}
+        <div className="flex-1 overflow-hidden">
           <ChatArea
             messages={messages}
             status={computedStatus}
@@ -174,9 +184,10 @@ const MessagePage = () => {
         </div>
 
         {/* Composer */}
-        <div className="sticky bottom-0 z-10 bg-white dark:bg-zinc-950 border-t border-zinc-200/60 dark:border-zinc-800/60">
+        <div className="flex-shrink-0 bg-white dark:bg-zinc-950 border-t border-zinc-200/60 dark:border-zinc-800/60">
           <Composer
             onSend={handleSendMessage}
+            onComparisonSend={handleComparisonSend}
             isStreaming={isStreaming}
             disabled={!isAuthenticated}
           />

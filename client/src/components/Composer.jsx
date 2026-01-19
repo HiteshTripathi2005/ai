@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from "react";
 import cx from "clsx";
-import { Send, Loader2, ChevronDown, Layers, X, Image as ImageIcon } from "lucide-react";
+import { Send, Loader2, ChevronDown, Layers, X, Image as ImageIcon, Sparkles } from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
 
-function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSend }) {
+function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSend, onComparisonSend }) {
   const [value, setValue] = useState("");
   const [selectedModel, setSelectedModel] = useState("gemini-2.0-flash-exp");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isMultiMode, setIsMultiMode] = useState(false);
+  const [isComparisonMode, setIsComparisonMode] = useState(false);
   const [selectedModels, setSelectedModels] = useState(["gemini-2.0-flash-exp"]);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -181,7 +182,9 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
           ...(imageUrls.length > 0 && { imageUrls })
         };
 
-        if (isMultiMode && onMultiModelSend) {
+        if (isComparisonMode && onComparisonSend) {
+          onComparisonSend(messageData);
+        } else if (isMultiMode && onMultiModelSend) {
           onMultiModelSend({ ...messageData, models: selectedModels });
         } else {
           onSend({ ...messageData, model: selectedModel });
@@ -196,7 +199,6 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
         setUploadedImages([]);
       } catch (error) {
         console.error('Failed to send message:', error);
-        // You could add error handling here, like showing a toast
       }
     }
   };
@@ -252,10 +254,10 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
           {/* Multi-mode toggle */}
           <button
             onClick={toggleMultiMode}
-            disabled={isStreaming}
+            disabled={isStreaming || isComparisonMode}
             className={cx(
               "inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors",
-              isStreaming
+              isStreaming || isComparisonMode
                 ? "bg-zinc-100 text-zinc-400 cursor-not-allowed border-zinc-200"
                 : isMultiMode
                 ? "bg-blue-500 text-white border-blue-500 hover:bg-blue-600"
@@ -267,7 +269,30 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
             {isMultiMode ? `${selectedModels.length} Models` : "Multi"}
           </button>
 
-          <div className="relative" ref={dropdownRef}>
+          {/* Comparison mode toggle */}
+          <button
+            onClick={() => {
+              setIsComparisonMode(!isComparisonMode);
+              if (!isComparisonMode) {
+                setIsMultiMode(false);
+              }
+            }}
+            disabled={isStreaming}
+            className={cx(
+              "inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors",
+              isStreaming
+                ? "bg-zinc-100 text-zinc-400 cursor-not-allowed border-zinc-200"
+                : isComparisonMode
+                ? "bg-purple-500 text-white border-purple-500 hover:bg-purple-600"
+                : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+            )}
+            title={isComparisonMode ? "Disable AI comparison" : "Let AI choose best response"}
+          >
+            <Sparkles className="h-4 w-4" />
+            {isComparisonMode ? "Best Response" : "Compare"}
+          </button>
+
+          {!isComparisonMode && <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
               disabled={isStreaming}
@@ -349,7 +374,7 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
                 )}
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         {/* Input Area */}
