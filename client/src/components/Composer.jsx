@@ -3,6 +3,7 @@ import cx from "clsx";
 import { Send, Loader2, ChevronDown, Layers, X, Image as ImageIcon, Sparkles } from "lucide-react";
 import api from "../utils/api";
 import toast from "react-hot-toast";
+import { modelNames } from "../data/model";
 
 function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSend, onComparisonSend }) {
   const [value, setValue] = useState("");
@@ -21,14 +22,11 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
   const sendDisabled = isStreaming || !value.trim() || disabled || hasUploadingImage;
   const inputDisabled = isStreaming;
 
-  // Available models
-  const models = [
-    { id: "gemini-2.0-flash-exp", name: "Gemini 2.0 Flash", provider: "Google" },
-    { id: "z-ai/glm-4.5-air:free", name: "GLM 4.5 Air", provider: "z-ai" },
-    { id: "qwen/qwen3-coder:free", name: "Qwen 3 Coder", provider: "qwen" },
-    { id: "mistralai/mistral-small-3.2-24b-instruct:free", name: "Mistral Small 3.2", provider: "mistralai" },
-    { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B", provider: "openai" },
-  ];
+  // Convert modelNames to array of model objects for easier iteration
+  const models = Object.entries(modelNames).map(([id, data]) => ({
+    id,
+    ...data
+  }));
 
   // Auto-focus the textarea when component mounts
   useEffect(() => {

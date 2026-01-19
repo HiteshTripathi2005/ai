@@ -7,6 +7,7 @@ import { taskTool, timeTool } from "../utils/tools.js";
 import { listEvents, createEvent, listCalendars, deleteEvent, createCalendar, deleteCalendar } from "../tools/calendar-tool.js";
 import { listEmails, sendEmail } from "../tools/gmail-tool.js";
 import { mcpToolsFromSmithery } from "../utils/mcp.js";
+import { getOpenRouterModelId } from '../data/models.js';
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -87,27 +88,7 @@ export const chat = async (req, res) => {
         };
 
         // Select model based on request
-        let selectedModel;
-        switch (model) {
-            case "gemini-2.0-flash-exp":
-                selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
-                break;
-            case "z-ai/glm-4.5-air:free":
-                selectedModel = openrouter.chat('z-ai/glm-4.5-air:free');
-                break;
-            case "qwen/qwen3-coder:free":
-                selectedModel = openrouter.chat('qwen/qwen3-coder:free');
-                break;
-            case "mistralai/mistral-small-3.2-24b-instruct:free":
-                selectedModel = openrouter.chat('mistralai/mistral-small-3.2-24b-instruct:free');
-                break;
-            case "openai/gpt-oss-20b:free":
-                selectedModel = openrouter.chat('openai/gpt-oss-20b:free');
-                break;
-            default:
-                selectedModel = openrouter.chat('google/gemini-2.0-flash-001');
-                break;
-        }
+        const selectedModel = getModelInstance(model);
 
         const messages = await buildMessagesArray(chat, prompt, userId);
 
@@ -394,20 +375,8 @@ export const updateChatTitle = async (req, res) => {
 
 // Helper function to get model instance
 const getModelInstance = (modelName) => {
-    switch (modelName) {
-        case "gemini-2.0-flash-exp":
-            return openrouter.chat('google/gemini-2.0-flash-001');
-        case "z-ai/glm-4.5-air:free":
-            return openrouter.chat('z-ai/glm-4.5-air:free');
-        case "qwen/qwen3-coder:free":
-            return openrouter.chat('qwen/qwen3-coder:free');
-        case "mistralai/mistral-small-3.2-24b-instruct:free":
-            return openrouter.chat('mistralai/mistral-small-3.2-24b-instruct:free');
-        case "openai/gpt-oss-20b:free":
-            return openrouter.chat('openai/gpt-oss-20b:free');
-        default:
-            return openrouter.chat('google/gemini-2.0-flash-001');
-    }
+    const openRouterModelId = getOpenRouterModelId(modelName);
+    return openrouter.chat(openRouterModelId);
 };
 
 // Multi-model chat - get responses from multiple models

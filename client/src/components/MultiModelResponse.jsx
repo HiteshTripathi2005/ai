@@ -4,14 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ToolCallRenderer from './ToolCallRenderer';
 import cx from 'clsx';
-
-const modelNames = {
-  "gemini-2.0-flash-exp": { name: "Gemini 2.0 Flash", provider: "Google" },
-  "z-ai/glm-4.5-air:free": { name: "GLM 4.5 Air", provider: "z-ai" },
-  "qwen/qwen3-coder:free": { name: "Qwen 3 Coder", provider: "qwen" },
-  "mistralai/mistral-small-3.2-24b-instruct:free": { name: "Mistral Small 3.2", provider: "mistralai" },
-  "openai/gpt-oss-20b:free": { name: "GPT-OSS 20B", provider: "openai" },
-};
+import { modelNames } from '../data/model';
 
 function MultiModelResponse({ msg, onSelectModel }) {
   const responses = msg.multiModelResponses || [];
