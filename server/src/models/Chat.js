@@ -73,6 +73,23 @@ const messageSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // For comparison responses
+  isComparison: {
+    type: Boolean,
+    default: false
+  },
+  comparisonData: {
+    responses: [{
+      model: String,
+      response: String,
+      success: Boolean,
+      rank: Number
+    }],
+    bestModel: String,
+    bestIndex: Number,
+    reasoning: String,
+    rankings: [Number]
+  },
   createdAt: {
     type: Date,
     default: Date.now
