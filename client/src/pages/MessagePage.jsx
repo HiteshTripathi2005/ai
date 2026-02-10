@@ -24,6 +24,7 @@ const MessagePage = () => {
     isLoadingMessages,
     sendMessage,
     sendComparisonMessage,
+    sendMultiModelMessage,
     selectChat,
     fetchChats,
     setCurrentChatId,
@@ -104,12 +105,12 @@ const MessagePage = () => {
     await sendMessage(message, chatId, model, imageUrls);
   };
 
-  const handleComparisonSend = async ({ message, imageUrls }) => {
+  const handleComparisonSend = async ({ message, models, imageUrls }) => {
     if (!isAuthenticated) {
       toast.error('Please login to send messages');
       return;
     }
-    await sendComparisonMessage(message, imageUrls);
+    await sendComparisonMessage(message, models, imageUrls);
   };
 
   const handleBackToHome = () => {
@@ -188,6 +189,9 @@ const MessagePage = () => {
           <Composer
             onSend={handleSendMessage}
             onComparisonSend={handleComparisonSend}
+            onMultiModelSend={isAuthenticated ? async ({ message, models, imageUrls }) => {
+              await sendMultiModelMessage(message, models, imageUrls);
+            } : () => toast.error('Please login to send messages')}
             isStreaming={isStreaming}
             disabled={!isAuthenticated}
           />

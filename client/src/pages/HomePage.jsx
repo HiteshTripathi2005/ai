@@ -140,14 +140,14 @@ const HomePage = () => {
               sendMultiModelMessage(message, models, imageUrls);
             }
           } : () => toast.error('Please login to send messages')}
-          onComparisonSend={isAuthenticated ? async ({ message, imageUrls }) => {
+          onComparisonSend={isAuthenticated ? async ({ message, models, imageUrls }) => {
             if (location.pathname === '/' || currentChatId === "default-chat") {
               const result = await handleNewChat(navigate);
               if (result && result.success) {
-                sendComparisonMessage(message, imageUrls);
+                sendComparisonMessage(message, models, imageUrls);
               }
             } else {
-              sendComparisonMessage(message, imageUrls);
+              sendComparisonMessage(message, models, imageUrls);
             }
           } : () => toast.error('Please login to send messages')}
           isStreaming={isStreaming}

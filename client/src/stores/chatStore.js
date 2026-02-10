@@ -683,11 +683,11 @@ export const useChatStore = create((set, get) => ({
     setSidebarOpen(!sidebarOpen);
   },
 
-  // Comparison send message - sends to 3 models and gets AI to choose best (non-streaming)
-  sendComparisonMessage: async (prompt, imageUrls = null) => {
-    if (!prompt.trim()) return;
+  // Comparison send message - SSE-based: sends to user-selected models, AI evaluates best
+  sendComparisonMessage: async (prompt, models, imageUrls = null) => {
+    if (!prompt.trim() || !models || models.length < 2) return;
 
-    const { messages, setMessages, setStatus, setError, currentChatId, fetchChats, setCurrentChatId } = get();
+    const { messages, setMessages, setStatus, setError, chatHistory, setChatHistory, currentChatId, fetchChats, setCurrentChatId, setStreamingChatId } = get();
 
     const userMsg = {
       id: Date.now() + "",
@@ -695,33 +695,51 @@ export const useChatStore = create((set, get) => ({
       parts: []
     };
 
-    // Add images first if provided
     if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
       imageUrls.forEach(imageUrl => {
-        userMsg.parts.push({
-          type: "image",
-          image: imageUrl
-        });
+        userMsg.parts.push({ type: "image", image: imageUrl });
       });
     }
-
-    // Add text after images
     userMsg.parts.push({ type: "text", text: prompt });
 
     const updatedMessages = [...messages, userMsg];
     setMessages(updatedMessages);
     setStatus("streaming");
+    setStreamingChatId(currentChatId);
+    setError(null);
+
+    // Update chatHistory
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === currentChatId
+        ? { ...chat, messages: updatedMessages }
+        : chat
+    );
+    setChatHistory(updatedChatHistory);
+
+    const assistantId = `${Date.now()}-comparison`;
+
+    // Initialize comparison state
+    const comparisonState = {
+      models: models.reduce((acc, m) => {
+        acc[m] = { status: 'pending', response: null };
+        return acc;
+      }, {}),
+      phase: 'loading', // loading | evaluating | complete
+      result: null
+    };
+
+    // Create initial comparison message
+    get().upsertComparisonMessage(assistantId, comparisonState);
 
     try {
       const response = await fetch(`${backendUrl}/api/chat/comparison`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           prompt,
           chatId: currentChatId === "default-chat" ? null : currentChatId,
+          models,
           ...(imageUrls && imageUrls.length > 0 && { imageUrls })
         })
       });
@@ -730,40 +748,170 @@ export const useChatStore = create((set, get) => ({
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let done = false;
+      let buffer = "";
 
-      if (data.success) {
-        // Add comparison metadata to the message
-        const messageWithComparison = {
-          ...data.data.message,
-          comparisonResult: data.data.comparisonResult
-        };
+      while (!done) {
+        const result = await reader.read();
+        done = result.done || false;
+        const chunk = result.value ? decoder.decode(result.value, { stream: !done }) : "";
+        if (!chunk) continue;
 
-        // Add the complete AI message with comparison metadata
-        const finalMessages = [...updatedMessages, messageWithComparison];
-        setMessages(finalMessages);
+        buffer += chunk;
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() ?? "";
 
-        // Update chat ID if it was created
-        if (data.data.chatId && currentChatId === "default-chat") {
-          setCurrentChatId(data.data.chatId);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith("data:")) continue;
+
+          const payload = trimmed.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+
+          try {
+            const evt = JSON.parse(payload);
+
+            if (evt.type === 'model-start') {
+              comparisonState.models[evt.model] = { status: 'loading', response: null };
+              get().upsertComparisonMessage(assistantId, { ...comparisonState });
+            } else if (evt.type === 'model-done') {
+              comparisonState.models[evt.model] = {
+                status: evt.success ? 'done' : 'error',
+                response: evt.response
+              };
+              get().upsertComparisonMessage(assistantId, { ...comparisonState });
+            } else if (evt.type === 'evaluating') {
+              comparisonState.phase = 'evaluating';
+              get().upsertComparisonMessage(assistantId, { ...comparisonState });
+            } else if (evt.type === 'comparison-complete') {
+              comparisonState.phase = 'complete';
+              comparisonState.result = {
+                rankings: evt.rankings,
+                bestModel: evt.bestModel,
+                bestIndex: evt.bestIndex,
+                reasoning: evt.reasoning,
+                chatId: evt.chatId,
+                messageId: evt.messageId
+              };
+              get().upsertComparisonMessage(assistantId, { ...comparisonState });
+
+              // Update chatId if new chat was created
+              if (evt.chatId && currentChatId === "default-chat") {
+                setCurrentChatId(evt.chatId);
+              }
+
+              // Update message ID to match server's saved ID
+              if (evt.messageId) {
+                const { messages: currentMessages, setMessages: setMsgs, chatHistory: ch, setChatHistory: setCH, currentChatId: cid } = get();
+                const updated = currentMessages.map(msg =>
+                  msg.id === assistantId ? { ...msg, id: evt.messageId } : msg
+                );
+                setMsgs(updated);
+                const updatedCH = ch.map(chat =>
+                  (chat._id || chat.id) === cid
+                    ? { ...chat, messages: chat.messages.map(msg => msg.id === assistantId ? { ...msg, id: evt.messageId } : msg) }
+                    : chat
+                );
+                setCH(updatedCH);
+              }
+            } else if (evt.type === 'error') {
+              throw new Error(evt.message || 'Comparison failed');
+            }
+          } catch (e) {
+            if (e.message && !e.message.includes('JSON')) {
+              throw e;
+            }
+          }
         }
-
-        setStatus("ready");
-        await fetchChats();
-
-        // Show notification about which model was selected
-        if (data.data.comparisonResult) {
-          console.log(`✨ Selected: ${data.data.comparisonResult.selectedModel}`);
-          console.log(`📝 Reasoning: ${data.data.comparisonResult.reasoning}`);
-        }
-      } else {
-        throw new Error(data.message || 'Failed to get comparison response');
       }
-    } catch (error) {
-      console.error('Comparison chat error:', error);
-      setError(error.message);
-      setStatus("error");
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast.error(`Comparison failed: ${errorMessage}`);
+    } finally {
+      setStatus("ready");
+      setStreamingChatId(null);
+
+      // Update chat title
+      const { chatHistory: ch, setChatHistory: setCH, currentChatId: finalChatId } = get();
+      const chatToUpdate = ch.find(chat => (chat._id || chat.id) === finalChatId);
+      if (chatToUpdate && (chatToUpdate.title === 'New Chat' || chatToUpdate.title.length < 10) && chatToUpdate.messages.length >= 2) {
+        const userMessage = chatToUpdate.messages.find(msg => msg.role === 'user');
+        if (userMessage && userMessage.parts) {
+          const textPart = userMessage.parts.find(p => p.type === 'text');
+          const userText = textPart?.text || '';
+          if (userText.trim()) {
+            let newTitle = userText.substring(0, 50) + (userText.length > 50 ? '...' : '');
+            if (newTitle.length < 10 && userText.length > 10) {
+              newTitle = userText.substring(0, 100) + (userText.length > 100 ? '...' : '');
+            }
+            const updatedCH = ch.map(chat =>
+              (chat._id || chat.id) === finalChatId ? { ...chat, title: newTitle } : chat
+            );
+            setCH(updatedCH);
+            get().updateChatTitle(finalChatId, newTitle);
+          }
+        }
+      }
+
+      if (currentChatId === "default-chat") {
+        try {
+          await get().fetchChats();
+          const updatedChats = get().chatHistory;
+          if (updatedChats.length > 0) {
+            const mostRecentChat = updatedChats[0];
+            setCurrentChatId(mostRecentChat._id || mostRecentChat.id);
+            setMessages(mostRecentChat.messages || []);
+          }
+        } catch (error) {
+          console.error('Failed to refresh chats:', error);
+        }
+      }
     }
+  },
+
+  // Upsert comparison message into messages array
+  upsertComparisonMessage: (assistantId, comparisonState) => {
+    const { messages, setMessages, chatHistory, setChatHistory, currentChatId, streamingChatId } = get();
+
+    const streamingChatData = chatHistory.find(chat => (chat._id || chat.id) === streamingChatId);
+    const baseMessages = streamingChatData ? streamingChatData.messages : messages;
+
+    let messageExists = false;
+    const updatedMessages = baseMessages.map((m) => {
+      if (m.id === assistantId) {
+        messageExists = true;
+        return {
+          ...m,
+          isComparison: true,
+          comparisonState: { ...comparisonState }
+        };
+      }
+      return m;
+    });
+
+    if (!messageExists) {
+      updatedMessages.push({
+        id: assistantId,
+        role: "assistant",
+        isComparison: true,
+        comparisonState: { ...comparisonState }
+      });
+    }
+
+    if (currentChatId === streamingChatId) {
+      setMessages(updatedMessages);
+    }
+
+    const chatIdToUpdate = streamingChatId || currentChatId;
+    const updatedChatHistory = chatHistory.map(chat =>
+      (chat._id || chat.id) === chatIdToUpdate
+        ? { ...chat, messages: updatedMessages }
+        : chat
+    );
+    setChatHistory(updatedChatHistory);
   },
 
   // Multi-model send message

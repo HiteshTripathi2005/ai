@@ -181,7 +181,11 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
         };
 
         if (isComparisonMode && onComparisonSend) {
-          onComparisonSend(messageData);
+          if (selectedModels.length < 2) {
+            toast.error('Select at least 2 models to compare');
+            return;
+          }
+          onComparisonSend({ ...messageData, models: selectedModels });
         } else if (isMultiMode && onMultiModelSend) {
           onMultiModelSend({ ...messageData, models: selectedModels });
         } else {
@@ -268,10 +272,16 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
           </button>
 
           {/* Comparison mode toggle */}
-          {/* <button
+          <button
             onClick={() => {
-              setIsComparisonMode(!isComparisonMode);
-              if (!isComparisonMode) {
+              const newMode = !isComparisonMode;
+              setIsComparisonMode(newMode);
+              if (newMode) {
+                setIsMultiMode(true);
+                if (selectedModels.length < 2) {
+                  setSelectedModels(["gemini-2.0-flash-exp", "z-ai/glm-4.5-air:free"]);
+                }
+              } else {
                 setIsMultiMode(false);
               }
             }}
@@ -288,9 +298,9 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
           >
             <Sparkles className="h-4 w-4" />
             {isComparisonMode ? "Best Response" : "Compare"}
-          </button> */}
+          </button>
 
-          {!isComparisonMode && <div className="relative" ref={dropdownRef}>
+          <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
               disabled={isStreaming}
@@ -324,9 +334,9 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
 
             {isModelDropdownOpen && (
               <div className="absolute bottom-full mb-1 left-0 z-50 w-64 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
-                {isMultiMode && (
+                {(isMultiMode || isComparisonMode) && (
                   <div className="px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-700">
-                    Select models to compare (min: 1)
+                    {isComparisonMode ? 'Select 2-5 models to compare' : 'Select models to compare (min: 1)'}
                   </div>
                 )}
                 <div className="py-1 max-h-48 overflow-y-auto">
@@ -372,7 +382,7 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
                 )}
               </div>
             )}
-          </div>}
+          </div>
         </div>
 
         {/* Input Area */}

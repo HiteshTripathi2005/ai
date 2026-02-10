@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import Loading from './Loading';
 import ToolCallRenderer from './ToolCallRenderer';
 import MultiModelResponse from './MultiModelResponse';
+import ComparisonResponse from './ComparisonResponse';
 
 function MessageBubble({ msg, onSelectModel }) {
   const isUser = msg.role === "user";
@@ -36,6 +37,11 @@ function MessageBubble({ msg, onSelectModel }) {
       }
     }
   };
+
+  // Check if this is a comparison message
+  if (msg.isComparison) {
+    return <ComparisonResponse msg={msg} />;
+  }
 
   // Check if this is a multi-model message
   if (msg.isMultiModel && msg.multiModelResponses) {

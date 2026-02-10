@@ -742,19 +742,30 @@ const buildMessagesArray = async (chat, currentPrompt, userId) => {
     return messages;
 };
 
-// Comparison chat - get responses from 3 models and let AI choose the best
+// Comparison chat - SSE-based: get responses from user-selected models, AI evaluates best
 export const comparisonChat = async (req, res) => {
     try {
-        const { prompt, chatId, imageUrls } = req.body;
+        const { prompt, chatId, imageUrls, models } = req.body;
         const userId = req.user._id;
         const user = req.user;
-
-        console.log("Comparison chat - Received prompt:", prompt);
-        console.log("User system prompt:", user.systemPrompt);
 
         if (!prompt) {
             return res.status(400).json({ error: "Prompt is required" });
         }
+
+        if (!models || !Array.isArray(models) || models.length < 2 || models.length > 5) {
+            return res.status(400).json({ error: "2-5 models are required" });
+        }
+
+        // Set up SSE
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
+
+        const sendSSE = (data) => {
+            res.write(`data: ${JSON.stringify(data)}\n\n`);
+        };
 
         // Find or create chat
         let chat = null;
@@ -779,175 +790,145 @@ export const comparisonChat = async (req, res) => {
             parts: []
         };
 
-        // Add images first if provided
         if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
             imageUrls.forEach(imageUrl => {
-                userMessage.parts.push({
-                    type: 'image',
-                    image: imageUrl
-                });
+                userMessage.parts.push({ type: 'image', image: imageUrl });
             });
         }
-
-        // Add text after images
         userMessage.parts.push({ type: 'text', text: prompt });
 
         chat.messages.push(userMessage);
         await chat.save();
 
-        // Define 3 models to compare
-        const modelsToCompare = [
-            { name: 'gemini-2.0-flash-exp', id: 'google/gemini-2.0-flash-001' },
-            { name: 'claude-3.5-sonnet', id: 'anthropic/claude-3.5-sonnet' },
-            { name: 'gpt-4o-mini', id: 'openai/gpt-4o-mini' }
-        ];
-
         // Prepare message content for models
         const messageContent = [];
         if (imageUrls && Array.isArray(imageUrls) && imageUrls.length > 0) {
             imageUrls.forEach(imageUrl => {
-                messageContent.push({
-                    type: 'image',
-                    image: imageUrl
-                });
+                messageContent.push({ type: 'image', image: imageUrl });
             });
         }
         messageContent.push({ type: 'text', text: prompt });
 
-        console.log('Fetching responses from 3 models in parallel...');
+        // Get responses from all models in parallel with SSE progress
+        const responses = await Promise.all(
+            models.map(async (modelName) => {
+                const modelId = getOpenRouterModelId(modelName);
+                sendSSE({ type: 'model-start', model: modelName });
 
-        // Get responses from all 3 models in parallel
-        const modelResponses = await Promise.allSettled(
-            modelsToCompare.map(async (model) => {
                 try {
-                    const modelInstance = openrouter.chat(model.id);
+                    const modelInstance = openrouter.chat(modelId);
                     const result = await streamText({
                         model: modelInstance,
-                        messages: [
-                            {
-                                role: 'user',
-                                content: messageContent
-                            }
-                        ],
+                        messages: [{ role: 'user', content: messageContent }],
                         maxTokens: 2000,
                     });
 
                     const fullText = await result.text;
-                    return {
-                        modelName: model.name,
-                        response: fullText,
-                        success: true
-                    };
+                    sendSSE({ type: 'model-done', model: modelName, response: fullText, success: true });
+                    return { modelName, response: fullText, success: true };
                 } catch (error) {
-                    console.error(`Error with model ${model.name}:`, error);
-                    return {
-                        modelName: model.name,
-                        response: `Error: ${error.message}`,
-                        success: false
-                    };
+                    console.error(`Error with model ${modelName}:`, error);
+                    const errMsg = `Error: ${error.message}`;
+                    sendSSE({ type: 'model-done', model: modelName, response: errMsg, success: false });
+                    return { modelName, response: errMsg, success: false };
                 }
             })
         );
 
-        // Extract successful responses
-        const responses = modelResponses.map((result, index) => {
-            if (result.status === 'fulfilled') {
-                return result.value;
-            } else {
-                return {
-                    modelName: modelsToCompare[index].name,
-                    response: 'Failed to get response',
-                    success: false
-                };
-            }
-        });
+        // Evaluation phase
+        sendSSE({ type: 'evaluating' });
 
-        console.log('Received responses from all models');
+        // Build dynamic evaluation prompt for N models
+        const responseSections = responses.map((r, i) =>
+            `Response ${i + 1} (${r.modelName}):\n${r.response}`
+        ).join('\n\n');
 
-        // Prepare evaluation prompt for Gemini
-        const evaluationPrompt = `${user.systemPrompt}
+        const evaluationPrompt = `${user.systemPrompt || ''}
 
-Here are three AI responses to the user's question: "${prompt}"
+Here are ${responses.length} AI responses to the user's question: "${prompt}"
 
-Response 1 (${responses[0].modelName}):
-${responses[0].response}
+${responseSections}
 
-Response 2 (${responses[1].modelName}):
-${responses[1].response}
+Based on your evaluation criteria, analyze these responses and select which one is the best. Return the 1-based index of the best response and a brief explanation of why you chose it.`;
 
-Response 3 (${responses[2].modelName}):
-${responses[2].response}
-
-Based on your evaluation criteria, analyze these responses and select which one is the best. Return the option number (1, 2, or 3) and a brief explanation of why you chose it.`;
-
-        // Define schema for structured output
         const evaluationSchema = z.object({
-            selectedOption: z.number().min(1).max(3).describe('The number of the selected response (1, 2, or 3)'),
-            reasoning: z.string().describe('Brief explanation of why this response was selected as the best')
+            bestResponse: z.number().min(1).max(responses.length).describe(`The 1-based index of the best response (1 to ${responses.length})`),
+            reasoning: z.string().describe('Brief explanation of why this response was selected as the best'),
+            rankings: z.array(z.number()).describe('Array of response indices ranked from best to worst (1-based)')
         });
 
-        // Get Gemini to evaluate and return structured decision
-        console.log('Asking Gemini to evaluate and select best response...');
         const evaluatorModel = openrouter.chat('google/gemini-2.0-flash-001');
-
-        const result = await generateObject({
+        const evalResult = await generateObject({
             model: evaluatorModel,
             schema: evaluationSchema,
             prompt: evaluationPrompt,
         });
 
-        const { selectedOption, reasoning } = result.object;
-        console.log(`Gemini selected option ${selectedOption}: ${reasoning}`);
+        const { bestResponse, reasoning, rankings } = evalResult.object;
+        const bestIndex = bestResponse - 1;
+        const bestModel = responses[bestIndex]?.modelName || models[0];
 
-        // Get the winning response
-        const winningResponse = responses[selectedOption - 1];
-        console.log(`Sending response from ${winningResponse.modelName}`);
+        // Build comparisonData for MongoDB
+        const comparisonData = {
+            responses: responses.map((r, i) => ({
+                model: r.modelName,
+                response: r.response,
+                success: r.success,
+                rank: rankings ? rankings.indexOf(i + 1) + 1 : (i === bestIndex ? 1 : i + 2)
+            })),
+            bestModel,
+            bestIndex,
+            reasoning,
+            rankings: rankings || []
+        };
 
-        // Prepare assistant message with the winning response
+        // Save assistant message with comparison data
         const assistantMessage = {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
+            isComparison: true,
+            comparisonData,
             parts: [{
                 type: 'text',
-                text: winningResponse.response
-            }],
-            metadata: {
-                selectedModel: winningResponse.modelName,
-                reasoning: reasoning,
-                comparedModels: responses.map(r => r.modelName)
-            }
+                text: responses[bestIndex]?.response || ''
+            }]
         };
 
-        // Save assistant message to chat
         chat.messages.push(assistantMessage);
         await chat.save();
 
-        console.log('Comparison chat completed and saved');
-
-        // Send complete response with metadata
-        res.status(200).json({
-            success: true,
-            data: {
-                chatId: chat._id,
-                message: assistantMessage,
-                comparisonResult: {
-                    selectedModel: winningResponse.modelName,
-                    reasoning: reasoning,
-                    allModels: responses.map(r => ({
-                        name: r.modelName,
-                        wasSelected: r.modelName === winningResponse.modelName
-                    }))
-                }
-            }
+        // Send final completion event
+        sendSSE({
+            type: 'comparison-complete',
+            rankings: rankings || [],
+            bestModel,
+            bestIndex,
+            reasoning,
+            chatId: chat._id,
+            messageId: assistantMessage.id
         });
+
+        res.write('data: [DONE]\n\n');
+        res.end();
 
     } catch (error) {
         console.error("Error in comparison chat:", error);
 
-        res.status(500).json({
-            success: false,
-            message: "Failed to process comparison chat",
-            error: error.message
-        });
+        // Try to send error via SSE if headers already sent
+        if (res.headersSent) {
+            try {
+                res.write(`data: ${JSON.stringify({ type: 'error', message: error.message })}\n\n`);
+                res.write('data: [DONE]\n\n');
+                res.end();
+            } catch (e) {
+                res.end();
+            }
+        } else {
+            res.status(500).json({
+                success: false,
+                message: "Failed to process comparison chat",
+                error: error.message
+            });
+        }
     }
 };
