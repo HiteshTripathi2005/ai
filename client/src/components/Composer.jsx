@@ -268,7 +268,7 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
           </button>
 
           {/* Comparison mode toggle */}
-          {/* <button
+          <button
             onClick={() => {
               setIsComparisonMode(!isComparisonMode);
               if (!isComparisonMode) {
@@ -288,7 +288,7 @@ function Composer({ onSend, isStreaming, width, disabled = false, onMultiModelSe
           >
             <Sparkles className="h-4 w-4" />
             {isComparisonMode ? "Best Response" : "Compare"}
-          </button> */}
+          </button>
 
           {!isComparisonMode && <div className="relative" ref={dropdownRef}>
             <button
