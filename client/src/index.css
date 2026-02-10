@@ -3,7 +3,8 @@
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 4px;
+  height: 4px;
 }
 
 input:focus {
@@ -153,6 +154,7 @@ textarea:focus-visible {
   padding: 1rem;
   border-radius: 6px;
   overflow-x: auto;
+  overflow-y: hidden;
   margin: 0.5rem 0;
   font-size: 0.875em;
 }
@@ -231,6 +233,16 @@ textarea:focus-visible {
 
 .animate-bounce {
   animation: bounce 1.4s infinite ease-in-out both;
+}
+
+/* Prose code blocks */
+.prose pre {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.prose code {
+  word-break: break-word;
 }
 
 /* Custom utility classes */
